@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Bar,
   BarChart,
@@ -191,6 +192,12 @@ export function DoapoApp({
             Index pulled
             <span className="mt-0.5 block font-mono text-fg">{pulledLabel(snap.pulledAt)}</span>
           </p>
+          <Link
+            to="/packet"
+            className="inline-flex h-11 items-center rounded-md border border-line bg-surface px-3 text-sm text-muted hover:text-fg"
+          >
+            Packet
+          </Link>
           <button
             type="button"
             onClick={onReload}
