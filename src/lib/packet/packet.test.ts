@@ -8,6 +8,12 @@ import { BAKKEN_PACK } from "./packs/bakken.ts";
 import { getPack, listPackIds, lookupPack } from "./packs/registry.ts";
 import { PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
 import { validateDomainPack, validateIssuePacket } from "./validate.ts";
+import {
+  MAX_EVAL_REASONS,
+  evaluatePacket,
+  openCandidate,
+  proposePacket,
+} from "./roles.ts";
 
 test("bakken pack validates", () => {
   const result = validateDomainPack(BAKKEN_PACK);
@@ -157,4 +163,156 @@ test("fixture human OPEN_CANDIDATE validates", () => {
   assert.equal(packet.packVersion, BAKKEN_PACK.version);
   const result = validateIssuePacket(packet);
   assert.equal(result.ok, true);
+});
+
+test("proposePacket rejects OPEN_CANDIDATE request", () => {
+  const result = proposePacket({
+    packId: "bakken",
+    packVersion: "1.0.0",
+    subjectId: "propose-open",
+    subjectLabel: "Propose OPEN Reject",
+    measuredFacts: [],
+    outcomeClassId: null,
+    designIntent: null,
+    fieldObservation: null,
+    advisorAnswers: [],
+    residue: [],
+    notes: "",
+    gate: "OPEN_CANDIDATE",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /anti-promotion/);
+  }
+});
+
+test("proposePacket STOP is ok and validates", () => {
+  const result = proposePacket({
+    packId: "bakken",
+    packVersion: "1.0.0",
+    subjectId: "propose-stop",
+    subjectLabel: "Propose STOP",
+    measuredFacts: [
+      {
+        key: "status",
+        value: "A",
+        evidence: "measured",
+        sourceLabel: "NDIC GIS",
+      },
+    ],
+    outcomeClassId: "producing",
+    designIntent: null,
+    fieldObservation: "Active on public index",
+    advisorAnswers: [],
+    residue: [],
+    notes: "agent STOP",
+    gate: "STOP",
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.packet.proposedBy, "agent_propose");
+    assert.equal(result.packet.gate, "STOP");
+    assert.equal(validateIssuePacket(result.packet).ok, true);
+  }
+});
+
+test("evaluatePacket never returns gate OPEN_CANDIDATE", () => {
+  const human = exampleHumanOpenCandidate();
+  assert.equal(human.gate, "OPEN_CANDIDATE");
+  const result = evaluatePacket(human);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.notEqual(result.packet.gate, "OPEN_CANDIDATE");
+    assert.ok(
+      result.verdict === "PASS" ||
+        result.verdict === "FAIL" ||
+        result.verdict === "RESIDUE",
+    );
+    assert.ok(result.reasons.length <= MAX_EVAL_REASONS);
+  }
+
+  const agentStop = proposePacket({
+    packId: BAKKEN_PACK.id,
+    packVersion: BAKKEN_PACK.version,
+    subjectId: "eval-stop",
+    subjectLabel: "Eval STOP",
+    measuredFacts: [],
+    outcomeClassId: null,
+    designIntent: null,
+    fieldObservation: null,
+    advisorAnswers: [],
+    residue: [
+      {
+        id: "keys-we-hold",
+        statement: "DOAPO owns the gate.",
+        evidence: "derived",
+      },
+    ],
+    notes: "",
+    gate: "STOP",
+  });
+  assert.equal(agentStop.ok, true);
+  if (agentStop.ok) {
+    const scored = evaluatePacket(agentStop.packet);
+    assert.equal(scored.ok, true);
+    if (scored.ok) {
+      assert.notEqual(scored.packet.gate, "OPEN_CANDIDATE");
+      assert.equal(scored.verdict, "RESIDUE");
+    }
+  }
+});
+
+test("openCandidate from agent_propose or evaluator fails", () => {
+  const base = exampleHumanOpenCandidate();
+  base.gate = "STOP";
+  base.proposedBy = "agent_propose";
+  const fromAgent = openCandidate(base, "agent_propose");
+  assert.equal(fromAgent.ok, false);
+  if (!fromAgent.ok) {
+    assert.match(fromAgent.reason, /human_open/);
+  }
+  const fromEval = openCandidate(base, "evaluator");
+  assert.equal(fromEval.ok, false);
+  if (!fromEval.ok) {
+    assert.match(fromEval.reason, /human_open/);
+  }
+});
+
+test("openCandidate from human_open yields OPEN_CANDIDATE", () => {
+  const proposed = proposePacket({
+    packId: BAKKEN_PACK.id,
+    packVersion: BAKKEN_PACK.version,
+    subjectId: "open-human",
+    subjectLabel: "Open Human Path",
+    measuredFacts: [
+      {
+        key: "status",
+        value: "NC",
+        evidence: "measured",
+        sourceLabel: "NDIC GIS",
+      },
+    ],
+    outcomeClassId: "duc",
+    designIntent: "Complete and bring online",
+    fieldObservation: "NC on public index",
+    advisorAnswers: [],
+    residue: [
+      {
+        id: "no-monthly-volumes",
+        statement: "Volumes not on open service",
+        evidence: "measured",
+      },
+    ],
+    notes: "ready for human OPEN",
+    gate: "RESIDUE",
+  });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+  const opened = openCandidate(proposed.packet, "human_open");
+  assert.equal(opened.ok, true);
+  if (opened.ok) {
+    assert.equal(opened.packet.gate, "OPEN_CANDIDATE");
+    assert.equal(opened.packet.proposedBy, "human_open");
+    assert.equal(validateIssuePacket(opened.packet).ok, true);
+  }
 });

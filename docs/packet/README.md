@@ -28,6 +28,16 @@ Layers must not promote into each other. Field data does not become design inten
 
 **Anti-promotion:** `agent_propose` **cannot** stamp `OPEN_CANDIDATE`. Validation fails closed with reason `anti-promotion: agent_propose cannot stamp OPEN_CANDIDATE`.
 
+### Runtime paths (propose / evaluate / open)
+
+| Path | Helper | May produce `OPEN_CANDIDATE`? |
+|------|--------|------------------------------|
+| Propose | `proposePacket` | **No** — forces `agent_propose`; rejects OPEN requests; default `STOP` |
+| Evaluate | `evaluatePacket` | **No** — returns PASS / FAIL / RESIDUE; strips OPEN from returned gate |
+| Open | `openCandidate` | **Only** when `openedBy === human_open` |
+
+See `roles.ts` and [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md).
+
 ## Evidence classes
 
 | Class | Meaning |
@@ -70,6 +80,7 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 | `packs/bakken.ts` | Bakken / Williston domain pack |
 | `packs/registry.ts` | Static pack map; `getPack` / `listPackIds` |
 | `fixtures/example-bakken-issue.ts` | STOP + valid OPEN examples |
+| `roles.ts` | Runtime propose / evaluate / open paths |
 | `packet.test.ts` | Node test suite |
 
 ## How to run tests
@@ -78,4 +89,4 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 ./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts
 ```
 
-See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [NEXT.md](NEXT.md).
+See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [NEXT.md](NEXT.md).
