@@ -4,7 +4,7 @@
 
 Multi-domain **issue-resolution packets** let DOAPO carry a typed proposal for a subject (e.g. a Bakken well) without collapsing design intent, measured field data, control language, and authorized action into one claim.
 
-A **domain pack** defines outcome classes, advisor checks, default residue, kill conditions, and arena benchmarks. An **issue packet** binds a subject to a pack with measured facts, answers, residue, authority role, and a gate verdict.
+A **domain pack** defines outcome classes, advisor checks, default residue, kill conditions, and public sources. An **issue packet** binds a subject to a pack with measured facts, answers, residue, authority role, and a gate verdict.
 
 ## Four truth layers
 
@@ -15,7 +15,7 @@ A **domain pack** defines outcome classes, advisor checks, default residue, kill
 | `field_data` | Measured substrate fields present or explicitly absent |
 | `authorized_action` | Who may propose, evaluate, OPEN, or execute |
 
-Layers must not promote into each other. Field data does not become design intent. Vendor pages do not become control envelopes.
+Layers must not promote into each other. Field data does not become design intent. External public pages do not become control envelopes.
 
 ## Authority roles + anti-promotion
 
@@ -61,9 +61,7 @@ See `roles.ts` and [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md).
 | `RESIDUE` | Proceed only with residue made explicit |
 | `ABSTAIN` | Insufficient authority or evidence |
 
-## Keys we hold vs arena open posture
-
-Public arena digital posture (e.g. eos marketing: sensor-to-screen, open architecture, consistency, visibility) is a **closed product** benchmark. Vocabulary can look close.
+## Gate authority (pack schema)
 
 **DOAPO owns:**
 
@@ -73,7 +71,7 @@ Public arena digital posture (e.g. eos marketing: sensor-to-screen, open archite
 - Human-only OPEN
 - Append-only seal ledger (in-memory demo / evidence backing)
 
-We do **not** claim shared control of vendor products, live pad telemetry, or affiliation.
+Public sources listed on a pack are substrate / standards pointers only. They are not controlling SOPs.
 
 ## File map (`src/lib/packet/`)
 

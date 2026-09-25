@@ -36,24 +36,19 @@ Mapped from NDIC status codes via `src/lib/outcomes.ts`:
 | `authority-boundary` | authorized_action | human_open |
 | `contracting-capacity` | authorized_action | human_open |
 
-## Residue (including keys-we-hold)
+## Residue
 
 | Id | Point |
 |----|-------|
 | `no-monthly-volumes` | Volumes not on open GIS substrate |
-| `no-vendor-sop` | Vendor pages = arena benchmarks only |
-| `keys-we-hold` | DOAPO owns gate, evidence class, residue, kills, human-only OPEN — not vendor product control |
+| `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
+| `keys-we-hold` | Gate authority (evidence class, residue, kills, human-only OPEN) defined by pack schema |
 | `confidential-lag` | Statutory withhold on confidential wells |
 
-## Arena benchmarks (non-affiliation)
+## Public sources
 
-Listed in the pack as **public competitive benchmarks only**. DOAPO has **no affiliation** with NexTier, Patterson-UTI, or any named completions vendor.
-
-- NDIC / DMR public oil & gas resources
-- NexTier public site (not affiliation)
-- NexTier eos public page (live-data posture; closed product — not OSS)
-- API public standards portal (envelope language)
+- NDIC / DMR public oil & gas resources (measured substrate)
 
 ## Kills
 
-`fake-affiliation`, `invented-volumes`, `agent-self-open`, `vendor-sop-as-law`.
+`unverified-org-claim`, `invented-volumes`, `agent-self-open`, `external-doc-as-sop`.

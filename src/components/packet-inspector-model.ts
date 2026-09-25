@@ -32,7 +32,7 @@ export type InspectorKillRow = {
   statement: string;
 };
 
-export type InspectorBenchmarkRow = {
+export type InspectorSourceRow = {
   label: string;
   url: string;
   evidence: EvidenceClass;
@@ -54,11 +54,11 @@ export type InspectorModel = {
   facts: InspectorFactRow[];
   residue: InspectorResidueRow[];
   killConditions: InspectorKillRow[];
-  arenaBenchmarks: InspectorBenchmarkRow[];
+  publicSources: InspectorSourceRow[];
   factsTruncated: boolean;
   residueTruncated: boolean;
   killsTruncated: boolean;
-  benchmarksTruncated: boolean;
+  sourcesTruncated: boolean;
 };
 
 function sliceFacts(packet: IssuePacket): {
@@ -118,13 +118,13 @@ function sliceKills(pack: DomainPack): {
   return { rows, truncated: source.length > MAX_KILL_CONDITIONS };
 }
 
-function sliceBenchmarks(pack: DomainPack): {
-  rows: InspectorBenchmarkRow[];
+function sliceSources(pack: DomainPack): {
+  rows: InspectorSourceRow[];
   truncated: boolean;
 } {
-  const source = pack.arenaBenchmarks;
+  const source = pack.publicSources;
   const bound = source.length < MAX_SOURCE_REFS ? source.length : MAX_SOURCE_REFS;
-  const rows: InspectorBenchmarkRow[] = [];
+  const rows: InspectorSourceRow[] = [];
   let i = 0;
   while (i < bound) {
     const row = source[i];
@@ -148,7 +148,7 @@ export function buildInspectorModel(
   const facts = sliceFacts(packet);
   const residue = sliceResidue(packet);
   const kills = sliceKills(pack);
-  const benchmarks = sliceBenchmarks(pack);
+  const sources = sliceSources(pack);
   return {
     packId: pack.id,
     packVersion: pack.version,
@@ -165,10 +165,10 @@ export function buildInspectorModel(
     facts: facts.rows,
     residue: residue.rows,
     killConditions: kills.rows,
-    arenaBenchmarks: benchmarks.rows,
+    publicSources: sources.rows,
     factsTruncated: facts.truncated,
     residueTruncated: residue.truncated,
     killsTruncated: kills.truncated,
-    benchmarksTruncated: benchmarks.truncated,
+    sourcesTruncated: sources.truncated,
   };
 }

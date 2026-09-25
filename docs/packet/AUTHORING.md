@@ -12,7 +12,7 @@ Checklist for adding a new pack under `src/lib/packet/packs/`. Follow NASA/JPL P
 | Kill conditions | `MAX_KILL_CONDITIONS` | 32 (≥1 required) |
 | Measured facts (packet) | `MAX_MEASURED_FACTS` | 128 |
 | Advisor answers (packet) | `MAX_ADVISOR_ANSWERS` | 64 |
-| Arena / source refs | `MAX_SOURCE_REFS` | 16 |
+| Public sources | `MAX_SOURCE_REFS` | 16 |
 | Id strings | `MAX_ID_LEN` | 64 |
 | Short text | `MAX_TEXT_LEN` | 512 |
 | Long text | `MAX_LONG_TEXT_LEN` | 2048 |
@@ -27,7 +27,7 @@ Stay inside these limits. Prefer `while` with a fixed upper bound over unbounded
 4. **Define** `advisorChecks` with correct `TruthLayerId` and `answerAuthority` (OPEN answers stay `human_open`).
 5. **Required residue** (see below).
 6. **Required kills** (see below).
-7. **Arena benchmarks** (optional): public URLs only; label them as non-affiliation if a vendor is named.
+7. **Public sources** (optional): substrate / standards URLs that serve the pack (prefer measured public GIS / regulator pages).
 8. **Register** in `packs/registry.ts` and re-export from `index.ts` if the pack is public API.
 9. **Validate** with `validateDomainPack` in `packet.test.ts`.
 10. **Fixture** at least one STOP and one valid human OPEN packet.
@@ -39,9 +39,10 @@ Every pack must make honesty explicit:
 | Residue | Requirement |
 |---------|-------------|
 | Substrate honesty | State what the measured substrate does **not** provide (e.g. no monthly volumes on open GIS). |
-| Non-affiliation | If any arena vendor is named in `arenaBenchmarks` or docs, include residue that those pages are **benchmarks only**, not employer affiliation or controlling SOP. |
+| Public docs not SOP | State that public product or marketing pages are not controlling field SOPs or setpoints. |
+| Gate authority | State that evidence class, residue, kill conditions, and human-only OPEN are defined by the pack schema. |
 
-Bakken reference ids: `no-monthly-volumes`, `no-vendor-sop`, `keys-we-hold`.
+Bakken reference ids: `no-monthly-volumes`, `public-docs-not-sop`, `keys-we-hold`.
 
 ## Required kills
 
@@ -49,9 +50,8 @@ Bakken reference ids: `no-monthly-volumes`, `no-vendor-sop`, `keys-we-hold`.
 |------|------------------|
 | `agent-self-open` | STOP if `agent_propose` stamps `OPEN_CANDIDATE` |
 | Invented claims | STOP if facts are asserted that the substrate cannot support |
-| `vendor-sop-as-law` | STOP if a public product page is promoted to binding SOP / setpoints |
-
-Also kill fake affiliation when arena names appear.
+| `external-doc-as-sop` | STOP if an external public page is treated as binding SOP / setpoints |
+| `unverified-org-claim` | STOP if the packet claims an organizational relationship unsupported by measured facts |
 
 ## Register in packs + index
 

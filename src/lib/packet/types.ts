@@ -35,7 +35,7 @@ export type AuthorityRole =
   | "human_open"
   | "ops_execute";
 
-/** Four-layer truth separation (arena pattern; not any vendor SOP). */
+/** Four-layer truth separation for pack authoring. */
 export type TruthLayerId =
   | "design"
   | "control_envelope"
@@ -86,11 +86,8 @@ export type DomainPack = {
   advisorChecks: AdvisorCheck[];
   residueDefaults: ResidueItem[];
   killConditions: KillCondition[];
-  /**
-   * Arena / leading-player references used as public benchmarks only.
-   * Never treat as employer, partner, or controlling SOP.
-   */
-  arenaBenchmarks: SourceRef[];
+  /** Public substrate / standards URLs that serve this pack (not SOPs). */
+  publicSources: SourceRef[];
 };
 
 export type MeasuredFact = {

@@ -75,7 +75,7 @@ export function exampleDucHumanOpenCandidate(): IssuePacket {
     {
       id: "keys-we-hold",
       statement:
-        "DOAPO owns the gate: evidence class, residue, kill conditions, and human-only OPEN.",
+        "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",
     },
     {
