@@ -3,22 +3,12 @@ import { PACKET_SCHEMA_VERSION, type DomainPack } from "../types.ts";
 
 /**
  * Bakken / Williston domain pack for DOAPO.
- * Substrate: public NDIC well index.
- * Arena benchmarks are public competitors/leaders for role shape only —
- * DOAPO has no affiliation with NexTier, Patterson-UTI, or any named vendor.
- *
- * Arena proximity vs keys we hold (eos public posture as benchmark only):
- * - They: sensor-to-screen live truth, open architecture into operator workflows,
- *   pad/crew consistency, visibility+control, automation runway (closed product).
- * - We: field_data + measured residue; fail-closed validate; owned multi-domain
- *   packs; four-layer truth split; agent_propose cannot OPEN; kill conditions
- *   for fake affiliation / vendor SOP-as-law.
- * Vocabulary can look close. Gates, authority, and substrate honesty are ours.
+ * Substrate: public NDIC well index. Fail-closed validate; human-only OPEN.
  */
 export const BAKKEN_PACK: DomainPack = {
   schemaVersion: PACKET_SCHEMA_VERSION,
   id: "bakken",
-  version: "1.1.0",
+  version: "1.2.0",
   title: "Bakken / Williston — Dakota oil & production outcomes",
   substrate:
     "North Dakota Industrial Commission (NDIC) public GIS well index: permit, spud, and well-status outcomes.",
@@ -73,15 +63,15 @@ export const BAKKEN_PACK: DomainPack = {
       evidence: "measured",
     },
     {
-      id: "no-vendor-sop",
+      id: "public-docs-not-sop",
       statement:
-        "Public vendor pages are arena benchmarks only. They are not DOAPO employer affiliation and not controlling field SOPs.",
+        "Public product or marketing pages are not controlling field SOPs or setpoints.",
       evidence: "measured",
     },
     {
       id: "keys-we-hold",
       statement:
-        "Arena leaders may sell live field visibility and open integration. DOAPO owns the gate: evidence class, residue, kill conditions, and human-only OPEN. Proximity of completions vocabulary is not shared control of the schema.",
+        "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",
     },
     {
@@ -93,9 +83,9 @@ export const BAKKEN_PACK: DomainPack = {
   ],
   killConditions: [
     {
-      id: "fake-affiliation",
+      id: "unverified-org-claim",
       statement:
-        "STOP if any packet claims DOAPO or the operator is affiliated with a named completions vendor.",
+        "STOP if the packet claims an organizational relationship that is not supported by measured facts.",
     },
     {
       id: "invented-volumes",
@@ -107,31 +97,16 @@ export const BAKKEN_PACK: DomainPack = {
       statement: "STOP if agent_propose stamps OPEN_CANDIDATE.",
     },
     {
-      id: "vendor-sop-as-law",
+      id: "external-doc-as-sop",
       statement:
-        "STOP if a public product page is promoted to binding SOP or pressure setpoints.",
+        "STOP if an external public page is treated as binding SOP or setpoints.",
     },
   ],
-  arenaBenchmarks: [
+  publicSources: [
     {
       label: "NDIC / DMR public oil & gas resources",
       url: "https://www.dmr.nd.gov/oilgas/",
       evidence: "measured",
-    },
-    {
-      label: "Arena benchmark — NexTier public site (not affiliation)",
-      url: "https://www.nextierofs.com/",
-      evidence: "derived",
-    },
-    {
-      label: "Arena benchmark — NexTier eos public page (live-data posture; not OSS)",
-      url: "https://nextierofs.com/digital-solutions/eos/",
-      evidence: "derived",
-    },
-    {
-      label: "API public standards portal (envelope language)",
-      url: "https://www.api.org/",
-      evidence: "derived",
     },
   ],
 };

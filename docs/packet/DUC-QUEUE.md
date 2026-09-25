@@ -38,14 +38,14 @@ Primary queue signal: **NC → `duc`**. Adjacent classes sit upstream / beside c
 | Id | Point |
 |----|-------|
 | `no-monthly-volumes` | Volumes not on open GIS substrate |
-| `no-vendor-sop` | Vendor pages = arena benchmarks only |
-| `keys-we-hold` | DOAPO owns gate, evidence class, residue, kills, human-only OPEN |
+| `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
+| `keys-we-hold` | Gate authority defined by pack schema |
 | `shared-ndic-different-lens` | Same NDIC substrate as `bakken`; different resolution lens |
 
-## Arena benchmarks (non-affiliation)
+## Public sources
 
-Same public competitive benchmarks as Bakken. DOAPO has **no affiliation** with NexTier or any named completions vendor.
+Same NDIC / DMR public oil & gas resources as Bakken (measured substrate).
 
 ## Kills
 
-`fake-affiliation`, `invented-volumes`, `agent-self-open`, `vendor-sop-as-law`.
+`unverified-org-claim`, `invented-volumes`, `agent-self-open`, `external-doc-as-sop`.

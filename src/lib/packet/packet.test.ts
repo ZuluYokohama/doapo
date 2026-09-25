@@ -29,11 +29,11 @@ test("bakken pack validates", () => {
   assert.ok(BAKKEN_PACK.killConditions.length >= 1);
 });
 
-test("bakken pack states non-affiliation residue", () => {
+test("bakken pack states public-docs-not-sop residue", () => {
   let found = false;
   let i = 0;
   while (i < BAKKEN_PACK.residueDefaults.length) {
-    if (BAKKEN_PACK.residueDefaults[i].id === "no-vendor-sop") {
+    if (BAKKEN_PACK.residueDefaults[i].id === "public-docs-not-sop") {
       found = true;
       break;
     }
@@ -154,7 +154,7 @@ test("duc-queue pack validates", () => {
   assert.equal(result.ok, true);
   assert.equal(DUC_QUEUE_PACK.id, "bakken-duc");
   assert.equal(DUC_QUEUE_PACK.schemaVersion, PACKET_SCHEMA_VERSION);
-  assert.equal(DUC_QUEUE_PACK.version, "1.0.0");
+  assert.equal(DUC_QUEUE_PACK.version, "1.1.0");
   assert.ok(DUC_QUEUE_PACK.outcomeClasses.length >= 1);
   assert.ok(DUC_QUEUE_PACK.killConditions.length >= 1);
 });
@@ -197,7 +197,7 @@ test("duc-queue pack states shared-substrate residue", () => {
 });
 
 test("duc-queue pack states required honesty residue", () => {
-  const needed = ["no-monthly-volumes", "no-vendor-sop", "keys-we-hold"];
+  const needed = ["no-monthly-volumes", "public-docs-not-sop", "keys-we-hold"];
   let n = 0;
   while (n < needed.length) {
     let found = false;
@@ -358,7 +358,7 @@ test("evaluatePacket never returns gate OPEN_CANDIDATE", () => {
     residue: [
       {
         id: "keys-we-hold",
-        statement: "DOAPO owns the gate.",
+        statement: "Gate authority defined by this pack schema.",
         evidence: "derived",
       },
     ],

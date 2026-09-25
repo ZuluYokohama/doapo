@@ -18,7 +18,7 @@ test("buildInspectorModel maps bakken human OPEN fixture", () => {
   assert.ok(model.facts.length >= 1);
   assert.ok(model.residue.length >= 1);
   assert.ok(model.killConditions.length >= 1);
-  assert.ok(model.arenaBenchmarks.length >= 1);
+  assert.ok(model.publicSources.length >= 1);
   assert.equal(model.factsTruncated, false);
   assert.equal(model.residueTruncated, false);
   assert.equal(model.designIntent, "Complete and bring online");

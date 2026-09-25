@@ -208,16 +208,12 @@ export function PacketInspector({ pack, packet, validation }: PacketInspectorPro
         ) : null}
       </Section>
 
-      <Section title="Arena benchmarks">
-        <p className="mb-2 text-xs text-muted">
-          Arena only — not affiliation. Public competitive posture; not employer,
-          partner, or controlling SOP.
-        </p>
-        {model.arenaBenchmarks.length === 0 ? (
-          <EmptyNote text="No arena benchmarks on this pack." />
+      <Section title="Public sources">
+        {model.publicSources.length === 0 ? (
+          <EmptyNote text="No public sources on this pack." />
         ) : (
           <ul className="space-y-2">
-            {model.arenaBenchmarks.map((row) => (
+            {model.publicSources.map((row) => (
               <li key={row.url} className="text-sm">
                 <a
                   href={row.url}
@@ -227,14 +223,14 @@ export function PacketInspector({ pack, packet, validation }: PacketInspectorPro
                 >
                   {row.label}
                 </a>
-                <span className="ml-2 text-xs text-muted">
-                  arena only — not affiliation · {row.evidence}
+                <span className="ml-2 text-xs tracking-wide text-muted uppercase">
+                  {row.evidence}
                 </span>
               </li>
             ))}
           </ul>
         )}
-        {model.benchmarksTruncated ? (
+        {model.sourcesTruncated ? (
           <p className="mt-2 text-xs text-muted">Truncated at MAX_SOURCE_REFS.</p>
         ) : null}
       </Section>

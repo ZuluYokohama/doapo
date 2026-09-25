@@ -163,13 +163,13 @@ function validateKill(row: KillCondition, index: number): ValidateResult {
 
 function validateSource(row: SourceRef, index: number): ValidateResult {
   if (!isNonEmptyString(row.label, MAX_TEXT_LEN)) {
-    return fail(`arenaBenchmarks[${index}].label invalid`);
+    return fail(`publicSources[${index}].label invalid`);
   }
   if (!isNonEmptyString(row.url, MAX_LONG_TEXT_LEN)) {
-    return fail(`arenaBenchmarks[${index}].url invalid`);
+    return fail(`publicSources[${index}].url invalid`);
   }
   if (!isEvidence(row.evidence)) {
-    return fail(`arenaBenchmarks[${index}].evidence invalid`);
+    return fail(`publicSources[${index}].evidence invalid`);
   }
   return ok();
 }
@@ -241,14 +241,14 @@ export function validateDomainPack(pack: DomainPack): ValidateResult {
   }
 
   if (
-    !Array.isArray(pack.arenaBenchmarks) ||
-    pack.arenaBenchmarks.length > MAX_SOURCE_REFS
+    !Array.isArray(pack.publicSources) ||
+    pack.publicSources.length > MAX_SOURCE_REFS
   ) {
-    return fail("arenaBenchmarks bounds");
+    return fail("publicSources bounds");
   }
   i = 0;
-  while (i < pack.arenaBenchmarks.length) {
-    const rowResult = validateSource(pack.arenaBenchmarks[i], i);
+  while (i < pack.publicSources.length) {
+    const rowResult = validateSource(pack.publicSources[i], i);
     if (!rowResult.ok) return rowResult;
     i += 1;
   }
