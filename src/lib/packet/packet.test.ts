@@ -316,3 +316,210 @@ test("openCandidate from human_open yields OPEN_CANDIDATE", () => {
     assert.equal(validateIssuePacket(opened.packet).ok, true);
   }
 });
+
+import {
+  MAX_SEALS,
+  appendOpenSeal,
+  appendSeal,
+  computeSealDigest,
+  createLedger,
+  listRecentSeals,
+  listSeals,
+  sealFromPacket,
+  tipDigest,
+  type SealAppendInput,
+} from "./ledger.ts";
+
+function makeSealInput(
+  overrides: Partial<SealAppendInput> & Pick<SealAppendInput, "id" | "prevDigest">,
+): SealAppendInput {
+  return {
+    id: overrides.id,
+    atIso: overrides.atIso ?? "2026-09-25T12:00:00.000Z",
+    kind: overrides.kind ?? "propose",
+    packetSubjectId: overrides.packetSubjectId ?? "subj-1",
+    packId: overrides.packId ?? "bakken",
+    gate: overrides.gate ?? "STOP",
+    proposedBy: overrides.proposedBy ?? "agent_propose",
+    prevDigest: overrides.prevDigest,
+    note: overrides.note ?? "test seal",
+  };
+}
+
+test("ledger genesis append sets tip", () => {
+  const ledger = createLedger();
+  assert.equal(tipDigest(ledger), null);
+  assert.equal(listSeals(ledger).length, 0);
+  const result = appendSeal(
+    ledger,
+    makeSealInput({ id: "seal-0", prevDigest: "" }),
+  );
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.record.prevDigest, "");
+    assert.ok(result.record.digest.length === 64);
+    assert.equal(tipDigest(result.ledger), result.record.digest);
+    assert.equal(listSeals(result.ledger).length, 1);
+  }
+});
+
+test("ledger chain integrity: tip links next prevDigest", () => {
+  const g = appendSeal(
+    createLedger(),
+    makeSealInput({ id: "seal-0", prevDigest: "" }),
+  );
+  assert.equal(g.ok, true);
+  if (!g.ok) return;
+  const tip = tipDigest(g.ledger);
+  assert.ok(tip !== null);
+  const next = appendSeal(
+    g.ledger,
+    makeSealInput({
+      id: "seal-1",
+      prevDigest: tip as string,
+      kind: "evaluate",
+      note: "eval pass",
+    }),
+  );
+  assert.equal(next.ok, true);
+  if (next.ok) {
+    assert.equal(next.record.prevDigest, tip);
+    assert.equal(listSeals(next.ledger).length, 2);
+    assert.equal(tipDigest(next.ledger), next.record.digest);
+  }
+});
+
+test("ledger rejects tampered prevDigest", () => {
+  const g = appendSeal(
+    createLedger(),
+    makeSealInput({ id: "seal-0", prevDigest: "" }),
+  );
+  assert.equal(g.ok, true);
+  if (!g.ok) return;
+  const bad = appendSeal(
+    g.ledger,
+    makeSealInput({
+      id: "seal-bad",
+      prevDigest: "deadbeef".repeat(8),
+    }),
+  );
+  assert.equal(bad.ok, false);
+  if (!bad.ok) {
+    assert.match(bad.reason, /prevDigest does not match tip/);
+  }
+  const badGenesis = appendSeal(
+    createLedger(),
+    makeSealInput({ id: "seal-x", prevDigest: "not-empty" }),
+  );
+  assert.equal(badGenesis.ok, false);
+  if (!badGenesis.ok) {
+    assert.match(badGenesis.reason, /genesis/);
+  }
+});
+
+test("ledger rejects over-capacity", () => {
+  let ledger = createLedger();
+  let i = 0;
+  while (i < MAX_SEALS) {
+    const tip = tipDigest(ledger);
+    const prev = tip === null ? "" : tip;
+    const r = appendSeal(
+      ledger,
+      makeSealInput({
+        id: "s-" + String(i),
+        prevDigest: prev,
+        note: "n-" + String(i),
+      }),
+    );
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    ledger = r.ledger;
+    i += 1;
+  }
+  assert.equal(listSeals(ledger).length, MAX_SEALS);
+  const tip = tipDigest(ledger);
+  assert.ok(tip !== null);
+  const overflow = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "overflow",
+      prevDigest: tip as string,
+    }),
+  );
+  assert.equal(overflow.ok, false);
+  if (!overflow.ok) {
+    assert.match(overflow.reason, /MAX_SEALS/);
+  }
+});
+
+test("ledger digests change with content", () => {
+  const a = computeSealDigest({
+    id: "same-id",
+    atIso: "2026-09-25T12:00:00.000Z",
+    kind: "propose",
+    packetSubjectId: "subj",
+    packId: "bakken",
+    gate: "STOP",
+    proposedBy: "agent_propose",
+    prevDigest: "",
+    note: "note-a",
+  });
+  const b = computeSealDigest({
+    id: "same-id",
+    atIso: "2026-09-25T12:00:00.000Z",
+    kind: "propose",
+    packetSubjectId: "subj",
+    packId: "bakken",
+    gate: "STOP",
+    proposedBy: "agent_propose",
+    prevDigest: "",
+    note: "note-b",
+  });
+  assert.notEqual(a, b);
+  assert.equal(a.length, 64);
+  assert.equal(b.length, 64);
+});
+
+test("sealFromPacket and appendOpenSeal after openCandidate", () => {
+  const proposed = proposePacket({
+    packId: BAKKEN_PACK.id,
+    packVersion: BAKKEN_PACK.version,
+    subjectId: "ledger-open",
+    subjectLabel: "Ledger Open",
+    measuredFacts: [],
+    outcomeClassId: null,
+    designIntent: null,
+    fieldObservation: null,
+    advisorAnswers: [],
+    residue: [],
+    notes: "for seal",
+    gate: "STOP",
+  });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+
+  let ledger = createLedger();
+  const proposeInput = sealFromPacket(
+    proposed.packet,
+    "propose",
+    "",
+    "propose STOP",
+  );
+  const sealedPropose = appendSeal(ledger, proposeInput);
+  assert.equal(sealedPropose.ok, true);
+  if (!sealedPropose.ok) return;
+  ledger = sealedPropose.ledger;
+
+  const opened = openCandidate(proposed.packet, "human_open");
+  assert.equal(opened.ok, true);
+  if (!opened.ok) return;
+  const sealedOpen = appendOpenSeal(ledger, opened);
+  assert.equal(sealedOpen.ok, true);
+  if (sealedOpen.ok) {
+    assert.equal(sealedOpen.record.kind, "open");
+    assert.equal(sealedOpen.record.gate, "OPEN_CANDIDATE");
+    assert.equal(listSeals(sealedOpen.ledger).length, 2);
+    const recent = listRecentSeals(sealedOpen.ledger, 8);
+    assert.equal(recent.length, 2);
+  }
+});

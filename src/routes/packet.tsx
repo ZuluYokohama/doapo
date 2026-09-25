@@ -7,12 +7,20 @@ import {
 } from "@/lib/packet/fixtures/example-bakken-issue";
 import {
   BAKKEN_PACK,
+  UI_LEDGER_CAP,
+  appendSeal,
+  createLedger,
   evaluatePacket,
+  listRecentSeals,
   lookupPack,
   openCandidate,
   proposePacket,
+  sealFromPacket,
+  tipDigest,
   validateIssuePacket,
   type IssuePacket,
+  type SealLedger,
+  type SealRecord,
 } from "@/lib/packet";
 
 export const Route = createFileRoute("/packet")({
@@ -48,8 +56,11 @@ type RuntimeStep = {
 function buildRuntimeDemo(): {
   steps: RuntimeStep[];
   packet: IssuePacket;
+  ledger: SealLedger;
 } {
   const steps: RuntimeStep[] = [];
+  let ledger = createLedger();
+
   const openAsk = proposePacket({
     packId: BAKKEN_PACK.id,
     packVersion: BAKKEN_PACK.version,
@@ -94,6 +105,21 @@ function buildRuntimeDemo(): {
       ? "ok — gate " + proposed.packet.gate + " / " + proposed.packet.proposedBy
       : proposed.reason,
   });
+  if (proposed.ok) {
+    const tip = tipDigest(ledger);
+    const sealed = appendSeal(
+      ledger,
+      sealFromPacket(
+        proposed.packet,
+        "propose",
+        tip === null ? "" : tip,
+        "runtime propose STOP",
+      ),
+    );
+    if (sealed.ok) {
+      ledger = sealed.ledger;
+    }
+  }
 
   const scored =
     proposed.ok
@@ -110,6 +136,21 @@ function buildRuntimeDemo(): {
         (scored.packet.gate === "OPEN_CANDIDATE" ? " (UNEXPECTED OPEN)" : "")
       : scored.reason,
   });
+  if (scored.ok) {
+    const tip = tipDigest(ledger);
+    const sealed = appendSeal(
+      ledger,
+      sealFromPacket(
+        scored.packet,
+        "evaluate",
+        tip === null ? "" : tip,
+        "verdict " + scored.verdict,
+      ),
+    );
+    if (sealed.ok) {
+      ledger = sealed.ledger;
+    }
+  }
 
   const agentOpen =
     scored.ok
@@ -137,13 +178,28 @@ function buildRuntimeDemo(): {
         humanOpen.packet.proposedBy
       : humanOpen.reason,
   });
+  if (humanOpen.ok) {
+    const tip = tipDigest(ledger);
+    const sealed = appendSeal(
+      ledger,
+      sealFromPacket(
+        humanOpen.packet,
+        "open",
+        tip === null ? "" : tip,
+        "human_open stamp",
+      ),
+    );
+    if (sealed.ok) {
+      ledger = sealed.ledger;
+    }
+  }
 
   const packet = humanOpen.ok
     ? humanOpen.packet
     : proposed.ok
       ? proposed.packet
       : humanSeed;
-  return { steps, packet };
+  return { steps, packet, ledger };
 }
 
 function RuntimePathStrip({ steps }: { steps: RuntimeStep[] }) {
@@ -177,6 +233,65 @@ function RuntimePathStrip({ steps }: { steps: RuntimeStep[] }) {
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+function shortDigest(hex: string): string {
+  if (hex.length <= 12) return hex;
+  return hex.slice(0, 8) + "…" + hex.slice(hex.length - 4);
+}
+
+function LedgerStrip({ ledger }: { ledger: SealLedger }) {
+  const tip = tipDigest(ledger);
+  const recent: SealRecord[] = listRecentSeals(ledger, UI_LEDGER_CAP);
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">Ledger</h2>
+      <p className="mt-2 text-sm text-muted">
+        Append-only seal demo in component state (cap {UI_LEDGER_CAP} shown). No
+        rewrite / delete. Tip is the chain head digest.
+      </p>
+      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-muted uppercase">Tip</dt>
+          <dd className="font-mono text-fg">
+            {tip === null ? "—" : shortDigest(tip)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted uppercase">Seals (shown)</dt>
+          <dd className="font-mono text-fg">{recent.length}</dd>
+        </div>
+      </dl>
+      {recent.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">No seals yet.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {recent.map((row) => (
+            <li
+              key={row.id + "-" + row.digest}
+              className="rounded-md border border-line bg-raised px-3 py-2 text-sm"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="font-mono text-fg">{row.kind}</span>
+                <span className="text-xs tracking-wide text-muted uppercase">
+                  {row.gate}
+                </span>
+              </div>
+              <p className="mt-1 font-mono text-xs text-muted">
+                {shortDigest(row.digest)} ←{" "}
+                {row.prevDigest.length === 0
+                  ? "genesis"
+                  : shortDigest(row.prevDigest)}
+              </p>
+              {row.note.length > 0 ? (
+                <p className="mt-1 text-muted">{row.note}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -255,7 +370,10 @@ function PacketPage() {
 
       <div className="mt-4">
         {fixtureId === "runtime" ? (
-          <RuntimePathStrip steps={runtime.steps} />
+          <>
+            <RuntimePathStrip steps={runtime.steps} />
+            <LedgerStrip ledger={runtime.ledger} />
+          </>
         ) : null}
         {!packLookup.ok ? (
           <section className="rounded-md border border-line bg-surface p-4">

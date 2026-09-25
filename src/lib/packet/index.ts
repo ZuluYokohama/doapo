@@ -48,6 +48,24 @@ export {
   type OpenResult,
 } from "./roles.ts";
 
+export {
+  MAX_SEALS,
+  UI_LEDGER_CAP,
+  createLedger,
+  appendSeal,
+  listSeals,
+  tipDigest,
+  computeSealDigest,
+  sealFromPacket,
+  appendOpenSeal,
+  listRecentSeals,
+  type SealKind,
+  type SealRecord,
+  type SealAppendInput,
+  type SealLedger,
+  type AppendSealResult,
+} from "./ledger.ts";
+
 export { BAKKEN_PACK } from "./packs/bakken.ts";
 
 export {

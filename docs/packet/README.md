@@ -48,6 +48,10 @@ See `roles.ts` and [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md).
 | `ledger` | Append-only seal / audit record |
 | `unknown` | Explicitly not known; do not invent |
 
+### Append-only seal ledger
+
+`ledger.ts` backs the `ledger` evidence class with bounded, fail-closed seals (`MAX_SEALS` = 256). Digests chain via `prevDigest` (empty string at genesis). No rewrite, delete, or middle insert. Roles stay pure; UI/demo may call `appendSeal` / `appendOpenSeal` after propose → evaluate → open. See [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
+
 ## Gate verdicts
 
 | Verdict | Meaning |
@@ -67,6 +71,7 @@ Public arena digital posture (e.g. eos marketing: sensor-to-screen, open archite
 - Fail-closed validate (anti-promotion, sizes, evidence)
 - Explicit residue and kill conditions
 - Human-only OPEN
+- Append-only seal ledger (in-memory demo / evidence backing)
 
 We do **not** claim shared control of vendor products, live pad telemetry, or affiliation.
 
@@ -81,6 +86,7 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 | `packs/registry.ts` | Static pack map; `getPack` / `listPackIds` |
 | `fixtures/example-bakken-issue.ts` | STOP + valid OPEN examples |
 | `roles.ts` | Runtime propose / evaluate / open paths |
+| `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain) |
 | `packet.test.ts` | Node test suite |
 
 ## How to run tests
@@ -89,4 +95,4 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 ./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts
 ```
 
-See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [NEXT.md](NEXT.md).
+See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).
