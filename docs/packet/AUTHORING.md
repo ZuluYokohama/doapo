@@ -42,7 +42,7 @@ Every pack must make honesty explicit:
 | Public docs not SOP | State that public product or marketing pages are not controlling field SOPs or setpoints. |
 | Gate authority | State that evidence class, residue, kill conditions, and human-only OPEN are defined by the pack schema. |
 
-Bakken reference ids: `no-monthly-volumes`, `public-docs-not-sop`, `keys-we-hold`.
+Bakken reference ids: `no-monthly-volumes`, `public-docs-not-sop`, `gate-authority`.
 
 ## Required kills
 

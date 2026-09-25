@@ -49,7 +49,7 @@ function outcomeClassesForQueue(): OutcomeClass[] {
 export const DUC_QUEUE_PACK: DomainPack = {
   schemaVersion: PACKET_SCHEMA_VERSION,
   id: "bakken-duc",
-  version: "1.1.0",
+  version: "1.1.1",
   title: "Bakken DUC queue — NDIC measured statuses only",
   substrate:
     "Same NDIC public GIS well index as pack bakken; resolution lens is DUC / NC / completion-readiness statuses only (no invented codes).",
@@ -105,7 +105,7 @@ export const DUC_QUEUE_PACK: DomainPack = {
       evidence: "measured",
     },
     {
-      id: "keys-we-hold",
+      id: "gate-authority",
       statement:
         "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",

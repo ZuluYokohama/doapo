@@ -39,7 +39,7 @@ Primary queue signal: **NC → `duc`**. Adjacent classes sit upstream / beside c
 |----|-------|
 | `no-monthly-volumes` | Volumes not on open GIS substrate |
 | `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
-| `keys-we-hold` | Gate authority defined by pack schema |
+| `gate-authority` | Gate authority defined by pack schema |
 | `shared-ndic-different-lens` | Same NDIC substrate as `bakken`; different resolution lens |
 
 ## Public sources
