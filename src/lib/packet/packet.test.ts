@@ -4,8 +4,13 @@ import {
   exampleAgentSelfOpenStop,
   exampleHumanOpenCandidate,
 } from "./fixtures/example-bakken-issue.ts";
+import {
+  exampleDucAgentSelfOpenStop,
+  exampleDucHumanOpenCandidate,
+} from "./fixtures/example-duc-queue-issue.ts";
 import { BAKKEN_PACK } from "./packs/bakken.ts";
-import { getPack, listPackIds, lookupPack } from "./packs/registry.ts";
+import { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
+import { getPack, listPackIds, lookupPack, MAX_REGISTERED_PACKS } from "./packs/registry.ts";
 import { PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
 import { validateDomainPack, validateIssuePacket } from "./validate.ts";
 import {
@@ -127,20 +132,129 @@ test("registry getPack unknown id is fail-closed", () => {
   }
 });
 
-test("registry listPackIds is bounded and includes bakken", () => {
+test("registry listPackIds is bounded and includes bakken and bakken-duc", () => {
   const ids = listPackIds();
-  assert.ok(ids.length >= 1);
-  assert.ok(ids.length <= 16);
-  let found = false;
+  assert.ok(ids.length >= 2);
+  assert.ok(ids.length <= MAX_REGISTERED_PACKS);
+  let foundBakken = false;
+  let foundDuc = false;
   let i = 0;
   while (i < ids.length) {
-    if (ids[i] === "bakken") {
+    if (ids[i] === "bakken") foundBakken = true;
+    if (ids[i] === "bakken-duc") foundDuc = true;
+    i += 1;
+  }
+  assert.equal(foundBakken, true);
+  assert.equal(foundDuc, true);
+});
+
+
+test("duc-queue pack validates", () => {
+  const result = validateDomainPack(DUC_QUEUE_PACK);
+  assert.equal(result.ok, true);
+  assert.equal(DUC_QUEUE_PACK.id, "bakken-duc");
+  assert.equal(DUC_QUEUE_PACK.schemaVersion, PACKET_SCHEMA_VERSION);
+  assert.equal(DUC_QUEUE_PACK.version, "1.0.0");
+  assert.ok(DUC_QUEUE_PACK.outcomeClasses.length >= 1);
+  assert.ok(DUC_QUEUE_PACK.killConditions.length >= 1);
+});
+
+test("duc-queue pack emphasizes NC / duc outcome class", () => {
+  let found = false;
+  let i = 0;
+  while (i < DUC_QUEUE_PACK.outcomeClasses.length) {
+    const row = DUC_QUEUE_PACK.outcomeClasses[i];
+    if (row.id === "duc") {
+      found = true;
+      let hasNc = false;
+      let j = 0;
+      while (j < row.statusCodes.length) {
+        if (row.statusCodes[j] === "NC") {
+          hasNc = true;
+          break;
+        }
+        j += 1;
+      }
+      assert.equal(hasNc, true);
+      break;
+    }
+    i += 1;
+  }
+  assert.equal(found, true);
+});
+
+test("duc-queue pack states shared-substrate residue", () => {
+  let found = false;
+  let i = 0;
+  while (i < DUC_QUEUE_PACK.residueDefaults.length) {
+    if (DUC_QUEUE_PACK.residueDefaults[i].id === "shared-ndic-different-lens") {
       found = true;
       break;
     }
     i += 1;
   }
   assert.equal(found, true);
+});
+
+test("duc-queue pack states required honesty residue", () => {
+  const needed = ["no-monthly-volumes", "no-vendor-sop", "keys-we-hold"];
+  let n = 0;
+  while (n < needed.length) {
+    let found = false;
+    let i = 0;
+    while (i < DUC_QUEUE_PACK.residueDefaults.length) {
+      if (DUC_QUEUE_PACK.residueDefaults[i].id === needed[n]) {
+        found = true;
+        break;
+      }
+      i += 1;
+    }
+    assert.equal(found, true, "missing residue " + needed[n]);
+    n += 1;
+  }
+});
+
+test("registry getPack returns bakken-duc", () => {
+  const pack = getPack("bakken-duc");
+  assert.ok(pack !== null);
+  if (pack !== null) {
+    assert.equal(pack.id, DUC_QUEUE_PACK.id);
+    assert.equal(pack.version, DUC_QUEUE_PACK.version);
+  }
+  const lookup = lookupPack("bakken-duc");
+  assert.equal(lookup.ok, true);
+  if (lookup.ok) {
+    assert.equal(lookup.pack.id, "bakken-duc");
+  }
+});
+
+test("fixture duc agent self-OPEN is STOP under validate", () => {
+  const packet = exampleDucAgentSelfOpenStop();
+  assert.equal(packet.proposedBy, "agent_propose");
+  assert.equal(packet.gate, "OPEN_CANDIDATE");
+  assert.equal(packet.packId, DUC_QUEUE_PACK.id);
+  const result = validateIssuePacket(packet);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /anti-promotion/);
+  }
+});
+
+test("fixture duc human OPEN_CANDIDATE validates", () => {
+  const packet = exampleDucHumanOpenCandidate();
+  assert.equal(packet.proposedBy, "human_open");
+  assert.equal(packet.gate, "OPEN_CANDIDATE");
+  assert.equal(packet.packId, DUC_QUEUE_PACK.id);
+  assert.equal(packet.packVersion, DUC_QUEUE_PACK.version);
+  assert.equal(packet.outcomeClassId, "duc");
+  const result = validateIssuePacket(packet);
+  assert.equal(result.ok, true);
+});
+
+test("registered pack count stays within MAX_REGISTERED_PACKS", () => {
+  const ids = listPackIds();
+  assert.ok(ids.length <= MAX_REGISTERED_PACKS);
+  assert.ok(ids.length >= 2);
 });
 
 test("fixture agent self-OPEN is STOP under validate", () => {

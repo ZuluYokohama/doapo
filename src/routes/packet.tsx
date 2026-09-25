@@ -6,11 +6,16 @@ import {
   exampleHumanOpenCandidate,
 } from "@/lib/packet/fixtures/example-bakken-issue";
 import {
+  exampleDucAgentSelfOpenStop,
+  exampleDucHumanOpenCandidate,
+} from "@/lib/packet/fixtures/example-duc-queue-issue";
+import {
   BAKKEN_PACK,
   UI_LEDGER_CAP,
   appendSeal,
   createLedger,
   evaluatePacket,
+  listPackIds,
   listRecentSeals,
   lookupPack,
   openCandidate,
@@ -27,18 +32,33 @@ export const Route = createFileRoute("/packet")({
   component: PacketPage,
 });
 
-type FixtureId = "agent-stop" | "human-open" | "runtime";
+type FixtureId =
+  | "agent-stop"
+  | "human-open"
+  | "duc-agent-stop"
+  | "duc-human-open"
+  | "runtime";
 
 const FIXTURES: { id: FixtureId; label: string; build: () => IssuePacket }[] = [
   {
     id: "agent-stop",
-    label: "Agent self-OPEN (invalid / STOP)",
+    label: "Bakken — agent self-OPEN (invalid)",
     build: exampleAgentSelfOpenStop,
   },
   {
     id: "human-open",
-    label: "Human OPEN_CANDIDATE (valid)",
+    label: "Bakken — human OPEN_CANDIDATE",
     build: exampleHumanOpenCandidate,
+  },
+  {
+    id: "duc-agent-stop",
+    label: "DUC queue — agent self-OPEN (invalid)",
+    build: exampleDucAgentSelfOpenStop,
+  },
+  {
+    id: "duc-human-open",
+    label: "DUC queue — human OPEN_CANDIDATE",
+    build: exampleDucHumanOpenCandidate,
   },
   {
     id: "runtime",
@@ -340,6 +360,15 @@ function PacketPage() {
           Wells home
         </Link>
       </header>
+
+      <section className="mt-4 rounded-md border border-line bg-surface p-3">
+        <h2 className="text-xs tracking-widest text-accent uppercase">
+          Registered packs
+        </h2>
+        <p className="mt-2 font-mono text-sm text-fg">
+          {listPackIds().join(" · ")}
+        </p>
+      </section>
 
       <div
         role="tablist"
