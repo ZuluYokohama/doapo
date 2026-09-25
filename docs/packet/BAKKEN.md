@@ -42,7 +42,7 @@ Mapped from NDIC status codes via `src/lib/outcomes.ts`:
 |----|-------|
 | `no-monthly-volumes` | Volumes not on open GIS substrate |
 | `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
-| `keys-we-hold` | Gate authority (evidence class, residue, kills, human-only OPEN) defined by pack schema |
+| `gate-authority` | Gate authority (evidence class, residue, kills, human-only OPEN) defined by pack schema |
 | `confidential-lag` | Statutory withhold on confidential wells |
 
 ## Public sources

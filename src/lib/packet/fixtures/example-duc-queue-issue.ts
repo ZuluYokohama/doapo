@@ -73,7 +73,7 @@ export function exampleDucHumanOpenCandidate(): IssuePacket {
       evidence: "measured",
     },
     {
-      id: "keys-we-hold",
+      id: "gate-authority",
       statement:
         "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",

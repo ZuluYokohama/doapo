@@ -8,7 +8,7 @@ import { PACKET_SCHEMA_VERSION, type DomainPack } from "../types.ts";
 export const BAKKEN_PACK: DomainPack = {
   schemaVersion: PACKET_SCHEMA_VERSION,
   id: "bakken",
-  version: "1.2.0",
+  version: "1.2.1",
   title: "Bakken / Williston — Dakota oil & production outcomes",
   substrate:
     "North Dakota Industrial Commission (NDIC) public GIS well index: permit, spud, and well-status outcomes.",
@@ -69,7 +69,7 @@ export const BAKKEN_PACK: DomainPack = {
       evidence: "measured",
     },
     {
-      id: "keys-we-hold",
+      id: "gate-authority",
       statement:
         "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",

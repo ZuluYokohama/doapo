@@ -42,11 +42,11 @@ test("bakken pack states public-docs-not-sop residue", () => {
   assert.equal(found, true);
 });
 
-test("bakken pack states keys-we-hold residue", () => {
+test("bakken pack states gate-authority residue", () => {
   let found = false;
   let i = 0;
   while (i < BAKKEN_PACK.residueDefaults.length) {
-    if (BAKKEN_PACK.residueDefaults[i].id === "keys-we-hold") {
+    if (BAKKEN_PACK.residueDefaults[i].id === "gate-authority") {
       found = true;
       break;
     }
@@ -197,7 +197,7 @@ test("duc-queue pack states shared-substrate residue", () => {
 });
 
 test("duc-queue pack states required honesty residue", () => {
-  const needed = ["no-monthly-volumes", "public-docs-not-sop", "keys-we-hold"];
+  const needed = ["no-monthly-volumes", "public-docs-not-sop", "gate-authority"];
   let n = 0;
   while (n < needed.length) {
     let found = false;
@@ -357,7 +357,7 @@ test("evaluatePacket never returns gate OPEN_CANDIDATE", () => {
     advisorAnswers: [],
     residue: [
       {
-        id: "keys-we-hold",
+        id: "gate-authority",
         statement: "Gate authority defined by this pack schema.",
         evidence: "derived",
       },
