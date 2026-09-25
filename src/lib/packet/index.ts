@@ -36,6 +36,18 @@ export {
   type ValidateErr,
 } from "./validate.ts";
 
+export {
+  MAX_EVAL_REASONS,
+  proposePacket,
+  evaluatePacket,
+  openCandidate,
+  type ProposeInput,
+  type ProposeResult,
+  type EvaluateVerdict,
+  type EvaluateResult,
+  type OpenResult,
+} from "./roles.ts";
+
 export { BAKKEN_PACK } from "./packs/bakken.ts";
 
 export {
