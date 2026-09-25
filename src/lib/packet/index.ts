@@ -37,3 +37,13 @@ export {
 } from "./validate.ts";
 
 export { BAKKEN_PACK } from "./packs/bakken.ts";
+
+export {
+  getPack,
+  lookupPack,
+  listPackIds,
+  MAX_REGISTERED_PACKS,
+  type PackLookupResult,
+  type PackLookupOk,
+  type PackLookupErr,
+} from "./packs/registry.ts";

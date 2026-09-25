@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  exampleAgentSelfOpenStop,
+  exampleHumanOpenCandidate,
+} from "./fixtures/example-bakken-issue.ts";
 import { BAKKEN_PACK } from "./packs/bakken.ts";
+import { getPack, listPackIds, lookupPack } from "./packs/registry.ts";
 import { PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
 import { validateDomainPack, validateIssuePacket } from "./validate.ts";
 
@@ -93,6 +98,63 @@ test("human_open may propose OPEN_CANDIDATE", () => {
     gate: "OPEN_CANDIDATE",
     notes: "Candidate only",
   };
+  const result = validateIssuePacket(packet);
+  assert.equal(result.ok, true);
+});
+
+test("registry getPack returns bakken", () => {
+  const pack = getPack("bakken");
+  assert.ok(pack !== null);
+  if (pack !== null) {
+    assert.equal(pack.id, BAKKEN_PACK.id);
+    assert.equal(pack.version, BAKKEN_PACK.version);
+  }
+});
+
+test("registry getPack unknown id is fail-closed", () => {
+  const pack = getPack("not-a-real-pack");
+  assert.equal(pack, null);
+  const lookup = lookupPack("not-a-real-pack");
+  assert.equal(lookup.ok, false);
+  if (!lookup.ok) {
+    assert.match(lookup.reason, /unknown pack id/);
+  }
+});
+
+test("registry listPackIds is bounded and includes bakken", () => {
+  const ids = listPackIds();
+  assert.ok(ids.length >= 1);
+  assert.ok(ids.length <= 16);
+  let found = false;
+  let i = 0;
+  while (i < ids.length) {
+    if (ids[i] === "bakken") {
+      found = true;
+      break;
+    }
+    i += 1;
+  }
+  assert.equal(found, true);
+});
+
+test("fixture agent self-OPEN is STOP under validate", () => {
+  const packet = exampleAgentSelfOpenStop();
+  assert.equal(packet.proposedBy, "agent_propose");
+  assert.equal(packet.gate, "OPEN_CANDIDATE");
+  assert.equal(packet.packId, BAKKEN_PACK.id);
+  const result = validateIssuePacket(packet);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /anti-promotion/);
+  }
+});
+
+test("fixture human OPEN_CANDIDATE validates", () => {
+  const packet = exampleHumanOpenCandidate();
+  assert.equal(packet.proposedBy, "human_open");
+  assert.equal(packet.gate, "OPEN_CANDIDATE");
+  assert.equal(packet.packId, BAKKEN_PACK.id);
+  assert.equal(packet.packVersion, BAKKEN_PACK.version);
   const result = validateIssuePacket(packet);
   assert.equal(result.ok, true);
 });
