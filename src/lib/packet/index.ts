@@ -78,3 +78,12 @@ export {
   type PackLookupOk,
   type PackLookupErr,
 } from "./packs/registry.ts";
+
+export {
+  MAX_WELL_FACTS,
+  wellToMeasuredFacts,
+  buildPacketFromWell,
+  type BuildPacketFromWellInput,
+  type BuildPacketResult,
+} from "./from-well.ts";
+

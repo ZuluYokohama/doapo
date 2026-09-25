@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { PacketInspector } from "@/components/packet-inspector";
 import {
@@ -13,6 +13,7 @@ import {
   BAKKEN_PACK,
   UI_LEDGER_CAP,
   appendSeal,
+  buildPacketFromWell,
   createLedger,
   evaluatePacket,
   listPackIds,
@@ -27,10 +28,38 @@ import {
   type SealLedger,
   type SealRecord,
 } from "@/lib/packet";
+import { searchWells } from "@/lib/ndic.functions";
+import {
+  formatApi,
+  formatSpud,
+  outcomeOf,
+  outcomeMeta,
+  statusLabel,
+  titleCounty,
+  type WellRow,
+} from "@/lib/outcomes";
+
+type PacketSearch = {
+  mode?: "fixtures" | "live";
+  api?: string;
+  pack?: string;
+};
 
 export const Route = createFileRoute("/packet")({
+  validateSearch: (raw: Record<string, unknown>): PacketSearch => {
+    const mode = raw.mode === "live" ? "live" : raw.mode === "fixtures" ? "fixtures" : undefined;
+    const api = typeof raw.api === "string" && raw.api.length > 0 && raw.api.length <= 32
+      ? raw.api
+      : undefined;
+    const pack = typeof raw.pack === "string" && raw.pack.length > 0 && raw.pack.length <= 64
+      ? raw.pack
+      : undefined;
+    return { mode, api, pack };
+  },
   component: PacketPage,
 });
+
+type PageMode = "fixtures" | "live";
 
 type FixtureId =
   | "agent-stop"
@@ -73,7 +102,7 @@ type RuntimeStep = {
   detail: string;
 };
 
-function buildRuntimeDemo(): {
+function buildRuntimeDemo(seed: IssuePacket): {
   steps: RuntimeStep[];
   packet: IssuePacket;
   ledger: SealLedger;
@@ -82,16 +111,16 @@ function buildRuntimeDemo(): {
   let ledger = createLedger();
 
   const openAsk = proposePacket({
-    packId: BAKKEN_PACK.id,
-    packVersion: BAKKEN_PACK.version,
+    packId: seed.packId,
+    packVersion: seed.packVersion,
     subjectId: "runtime-agent-open",
-    subjectLabel: "Runtime Agent OPEN Ask",
-    measuredFacts: [],
-    outcomeClassId: null,
-    designIntent: null,
-    fieldObservation: null,
+    subjectLabel: seed.subjectLabel,
+    measuredFacts: seed.measuredFacts,
+    outcomeClassId: seed.outcomeClassId,
+    designIntent: seed.designIntent,
+    fieldObservation: seed.fieldObservation,
     advisorAnswers: [],
-    residue: [],
+    residue: seed.residue,
     notes: "agent asks OPEN",
     gate: "OPEN_CANDIDATE",
   });
@@ -103,23 +132,22 @@ function buildRuntimeDemo(): {
       : "fail-closed — " + openAsk.reason,
   });
 
-  const humanSeed = exampleHumanOpenCandidate();
   const proposed = proposePacket({
-    packId: humanSeed.packId,
-    packVersion: humanSeed.packVersion,
+    packId: seed.packId,
+    packVersion: seed.packVersion,
     subjectId: "runtime-propose",
-    subjectLabel: humanSeed.subjectLabel,
-    measuredFacts: humanSeed.measuredFacts,
-    outcomeClassId: humanSeed.outcomeClassId,
-    designIntent: humanSeed.designIntent,
-    fieldObservation: humanSeed.fieldObservation,
-    advisorAnswers: humanSeed.advisorAnswers,
-    residue: humanSeed.residue,
+    subjectLabel: seed.subjectLabel,
+    measuredFacts: seed.measuredFacts,
+    outcomeClassId: seed.outcomeClassId,
+    designIntent: seed.designIntent,
+    fieldObservation: seed.fieldObservation,
+    advisorAnswers: seed.advisorAnswers,
+    residue: seed.residue,
     notes: "runtime propose STOP",
     gate: "STOP",
   });
   steps.push({
-    label: "2. agent propose STOP (human fixture fields)",
+    label: "2. agent propose STOP (seed fields)",
     ok: proposed.ok,
     detail: proposed.ok
       ? "ok — gate " + proposed.packet.gate + " / " + proposed.packet.proposedBy
@@ -218,7 +246,7 @@ function buildRuntimeDemo(): {
     ? humanOpen.packet
     : proposed.ok
       ? proposed.packet
-      : humanSeed;
+      : seed;
   return { steps, packet, ledger };
 }
 
@@ -316,14 +344,314 @@ function LedgerStrip({ ledger }: { ledger: SealLedger }) {
   );
 }
 
+function LiveWellPanel({
+  packId,
+  onPackId,
+  selected,
+  onSelected,
+  draft,
+  onDraft,
+  results,
+  total,
+  loading,
+  error,
+  onSearch,
+  buildError,
+}: {
+  packId: string;
+  onPackId: (id: string) => void;
+  selected: WellRow | null;
+  onSelected: (well: WellRow) => void;
+  draft: string;
+  onDraft: (value: string) => void;
+  results: WellRow[];
+  total: number | null;
+  loading: boolean;
+  error: string | null;
+  onSearch: (event: FormEvent) => void;
+  buildError: string | null;
+}) {
+  const packIds = listPackIds();
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Live well
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Search the NDIC public well index. Measured facts only — no invented
+        oil, gas, or water volumes.
+      </p>
+
+      <label className="mt-3 block text-xs tracking-wide text-muted uppercase">
+        Domain pack
+        <select
+          value={packId}
+          onChange={(event) => onPackId(event.target.value)}
+          className="mt-1 h-11 w-full rounded-md border border-line bg-bg px-3 text-sm text-fg sm:max-w-xs"
+        >
+          {packIds.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <form onSubmit={onSearch} className="mt-3 flex gap-2">
+        <label className="relative min-w-0 flex-1">
+          <span className="sr-only">Search file number, API, well, or operator</span>
+          <input
+            value={draft}
+            onChange={(event) => onDraft(event.target.value)}
+            placeholder="File no., API, well, operator"
+            className="h-11 w-full rounded-md border border-line bg-bg px-3 text-sm text-fg placeholder:text-muted"
+          />
+        </label>
+        <button
+          type="submit"
+          className="h-11 rounded-md bg-accent px-4 text-sm font-medium text-ink"
+        >
+          Find
+        </button>
+      </form>
+
+      {error ? (
+        <p className="mt-3 text-sm text-accent" role="alert">
+          fail-closed — {error}
+        </p>
+      ) : null}
+      {buildError ? (
+        <p className="mt-3 text-sm text-accent" role="alert">
+          fail-closed — {buildError}
+        </p>
+      ) : null}
+
+      {loading ? <p className="mt-3 text-xs text-muted">Pulling wells…</p> : null}
+
+      {!loading && results.length === 0 && !error ? (
+        <p className="mt-3 text-sm text-muted">
+          No well selected. Search and pick a row to build a packet.
+        </p>
+      ) : null}
+
+      {results.length > 0 ? (
+        <>
+          <p className="mt-3 font-mono text-xs text-muted">
+            {total != null ? `${total} match${total === 1 ? "" : "es"}` : "Results"}
+          </p>
+          <ul className="mt-2 max-h-64 divide-y divide-line overflow-y-auto border-y border-line">
+            {results.map((well) => {
+              const on =
+                selected?.fileNo === well.fileNo &&
+                selected?.api === well.api &&
+                selected?.wellName === well.wellName;
+              const outcome = outcomeOf(well.status);
+              return (
+                <li key={`${well.fileNo}-${well.api}-${well.wellName}`}>
+                  <button
+                    type="button"
+                    onClick={() => onSelected(well)}
+                    className={
+                      "flex w-full min-h-11 flex-col gap-1 py-3 text-left sm:flex-row sm:items-baseline sm:justify-between " +
+                      (on ? "bg-raised px-2" : "px-1")
+                    }
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-fg">
+                        {well.wellName ?? "Unnamed well"}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {formatApi(well.api)} · {well.operator ?? "Unknown"} ·{" "}
+                        {titleCounty(well.county)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-left sm:text-right">
+                      <span className="block font-mono text-xs text-accent">
+                        {outcome
+                          ? outcomeMeta(outcome).short
+                          : statusLabel(well.status)}
+                      </span>
+                      <span className="block font-mono text-xs text-muted tabular-nums">
+                        {formatSpud(well.spud)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function PacketPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  const initialMode: PageMode =
+    search.mode === "live" || (search.api != null && search.api.length > 0)
+      ? "live"
+      : "fixtures";
+
+  const [pageMode, setPageMode] = useState<PageMode>(initialMode);
   const [fixtureId, setFixtureId] = useState<FixtureId>("human-open");
+  const [packId, setPackId] = useState(
+    () => search.pack ?? listPackIds()[0] ?? BAKKEN_PACK.id,
+  );
+  const [draft, setDraft] = useState(() => search.api ?? "");
+  const [query, setQuery] = useState(() => search.api ?? "");
+  const [results, setResults] = useState<WellRow[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<WellRow | null>(null);
+  const [runLiveRuntime, setRunLiveRuntime] = useState(false);
 
-  const runtime = useMemo(() => buildRuntimeDemo(), []);
+  useEffect(() => {
+    if (pageMode !== "live") return;
+    if (!query.trim()) {
+      setResults([]);
+      setTotal(null);
+      setListError(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setListError(null);
+    searchWells({ data: { q: query.trim() } })
+      .then((result) => {
+        if (cancelled) return;
+        setResults(result.wells);
+        setTotal(result.total);
+        if (result.wells.length === 1) {
+          setSelected(result.wells[0]);
+        } else if (search.api) {
+          const digits = search.api.replace(/\D/g, "");
+          let i = 0;
+          let match: WellRow | null = null;
+          while (i < result.wells.length) {
+            const apiDigits = (result.wells[i].api ?? "").replace(/\D/g, "");
+            if (
+              apiDigits === digits ||
+              (result.wells[i].api ?? "") === search.api
+            ) {
+              match = result.wells[i];
+              break;
+            }
+            i += 1;
+          }
+          if (match) setSelected(match);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setResults([]);
+        setTotal(null);
+        setSelected(null);
+        setListError(
+          error instanceof Error ? error.message : "Search failed",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageMode, query, search.api]);
 
-  const packet = useMemo(() => {
+  function setMode(next: PageMode) {
+    setPageMode(next);
+    setRunLiveRuntime(false);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: next,
+        api: next === "live" ? (selected?.api ?? prev.api) : undefined,
+        pack: next === "live" ? packId : undefined,
+      }),
+    });
+  }
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    const q = draft.trim();
+    setQuery(q);
+    setSelected(null);
+    setRunLiveRuntime(false);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: "live",
+        api: q || undefined,
+        pack: packId,
+      }),
+    });
+  }
+
+  function selectWell(well: WellRow) {
+    setSelected(well);
+    setRunLiveRuntime(false);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: "live",
+        api: well.api ?? prev.api,
+        pack: packId,
+      }),
+    });
+  }
+
+  function changePack(id: string) {
+    setPackId(id);
+    setRunLiveRuntime(false);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: "live",
+        pack: id,
+      }),
+    });
+  }
+
+  const packLookup = lookupPack(packId);
+
+  const liveBuilt = useMemo(() => {
+    if (pageMode !== "live") return null;
+    if (!selected) return null;
+    const looked = lookupPack(packId);
+    if (!looked.ok) {
+      return { ok: false as const, reason: looked.reason };
+    }
+    return buildPacketFromWell({
+      well: selected,
+      pack: looked.pack,
+      proposedBy: "agent_propose",
+      gate: "STOP",
+    });
+  }, [pageMode, selected, packId]);
+
+  const livePacket =
+    liveBuilt && liveBuilt.ok ? liveBuilt.packet : null;
+  const liveBuildError =
+    liveBuilt && !liveBuilt.ok ? liveBuilt.reason : null;
+
+  const fixtureRuntime = useMemo(
+    () => buildRuntimeDemo(exampleHumanOpenCandidate()),
+    [],
+  );
+
+  const liveRuntime = useMemo(() => {
+    if (!livePacket || !runLiveRuntime) return null;
+    return buildRuntimeDemo(livePacket);
+  }, [livePacket, runLiveRuntime]);
+
+  const fixturePacket = useMemo(() => {
     if (fixtureId === "runtime") {
-      return runtime.packet;
+      return fixtureRuntime.packet;
     }
     let i = 0;
     while (i < FIXTURES.length) {
@@ -333,10 +661,21 @@ function PacketPage() {
       i += 1;
     }
     return exampleHumanOpenCandidate();
-  }, [fixtureId, runtime.packet]);
+  }, [fixtureId, fixtureRuntime.packet]);
 
-  const validation = useMemo(() => validateIssuePacket(packet), [packet]);
-  const packLookup = lookupPack(packet.packId);
+  const packet: IssuePacket | null =
+    pageMode === "live"
+      ? liveRuntime
+        ? liveRuntime.packet
+        : livePacket
+      : fixturePacket;
+
+  const validation = useMemo(
+    () => (packet ? validateIssuePacket(packet) : null),
+    [packet],
+  );
+
+  const inspectorPackLookup = packet ? lookupPack(packet.packId) : packLookup;
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6">
@@ -349,8 +688,8 @@ function PacketPage() {
             Packet inspector
           </h1>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Read-only view of domain pack + issue packet + validate result (gate +
-            residue). Fixtures only — no NDIC loader.
+            Domain pack + issue packet + validate (gate + residue). Fixtures or
+            a live NDIC well row — fail-closed, no invented volumes.
           </p>
         </div>
         <Link
@@ -372,18 +711,23 @@ function PacketPage() {
 
       <div
         role="tablist"
-        aria-label="Fixture packets"
+        aria-label="Packet source mode"
         className="mt-4 flex flex-wrap gap-2"
       >
-        {FIXTURES.map((row) => {
-          const on = row.id === fixtureId;
+        {(
+          [
+            { id: "fixtures" as const, label: "Fixtures" },
+            { id: "live" as const, label: "Live well" },
+          ] as const
+        ).map((row) => {
+          const on = pageMode === row.id;
           return (
             <button
               key={row.id}
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => setFixtureId(row.id)}
+              onClick={() => setMode(row.id)}
               className={
                 "min-h-11 rounded-md border px-3 py-2 text-left text-sm " +
                 (on
@@ -397,30 +741,116 @@ function PacketPage() {
         })}
       </div>
 
+      {pageMode === "fixtures" ? (
+        <div
+          role="tablist"
+          aria-label="Fixture packets"
+          className="mt-4 flex flex-wrap gap-2"
+        >
+          {FIXTURES.map((row) => {
+            const on = row.id === fixtureId;
+            return (
+              <button
+                key={row.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setFixtureId(row.id)}
+                className={
+                  "min-h-11 rounded-md border px-3 py-2 text-left text-sm " +
+                  (on
+                    ? "border-accent bg-accent text-ink"
+                    : "border-line bg-surface text-fg")
+                }
+              >
+                {row.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-4">
+          <LiveWellPanel
+            packId={packId}
+            onPackId={changePack}
+            selected={selected}
+            onSelected={selectWell}
+            draft={draft}
+            onDraft={setDraft}
+            results={results}
+            total={total}
+            loading={loading}
+            error={listError}
+            onSearch={submitSearch}
+            buildError={liveBuildError}
+          />
+          {livePacket ? (
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setRunLiveRuntime(true)}
+                className={
+                  "min-h-11 rounded-md border px-3 py-2 text-sm " +
+                  (runLiveRuntime
+                    ? "border-accent bg-accent text-ink"
+                    : "border-line bg-surface text-fg")
+                }
+              >
+                Runtime path (propose → evaluate → open)
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       <div className="mt-4">
-        {fixtureId === "runtime" ? (
+        {pageMode === "fixtures" && fixtureId === "runtime" ? (
           <>
-            <RuntimePathStrip steps={runtime.steps} />
-            <LedgerStrip ledger={runtime.ledger} />
+            <RuntimePathStrip steps={fixtureRuntime.steps} />
+            <LedgerStrip ledger={fixtureRuntime.ledger} />
           </>
         ) : null}
-        {!packLookup.ok ? (
+        {pageMode === "live" && liveRuntime ? (
+          <>
+            <RuntimePathStrip steps={liveRuntime.steps} />
+            <LedgerStrip ledger={liveRuntime.ledger} />
+          </>
+        ) : null}
+        {pageMode === "live" && !packet ? (
           <section className="rounded-md border border-line bg-surface p-4">
             <h2 className="text-xs tracking-widest text-accent uppercase">
-              Pack lookup
+              Packet
             </h2>
-            <p className="mt-3 text-sm text-fg">
-              <span className="font-mono text-accent">fail-closed</span> —{" "}
-              {packLookup.reason}
+            <p className="mt-3 text-sm text-muted">
+              {listError
+                ? "Search failed — no packet."
+                : liveBuildError
+                  ? "Build failed — no packet."
+                  : !packLookup.ok
+                    ? "Unknown pack — fail-closed."
+                    : "Select a live well to inspect a packet."}
             </p>
           </section>
-        ) : (
-          <PacketInspector
-            pack={packLookup.pack}
-            packet={packet}
-            validation={validation}
-          />
-        )}
+        ) : null}
+        {packet && validation ? (
+          !inspectorPackLookup.ok ? (
+            <section className="rounded-md border border-line bg-surface p-4">
+              <h2 className="text-xs tracking-widest text-accent uppercase">
+                Pack lookup
+              </h2>
+              <p className="mt-3 text-sm text-fg">
+                <span className="font-mono text-accent">fail-closed</span> —{" "}
+                {inspectorPackLookup.reason}
+              </p>
+            </section>
+          ) : (
+            <PacketInspector
+              pack={inspectorPackLookup.pack}
+              packet={packet}
+              validation={validation}
+            />
+          )
+        ) : null}
       </div>
     </main>
   );
