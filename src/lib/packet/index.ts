@@ -67,6 +67,7 @@ export {
 } from "./ledger.ts";
 
 export { BAKKEN_PACK } from "./packs/bakken.ts";
+export { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
 
 export {
   getPack,

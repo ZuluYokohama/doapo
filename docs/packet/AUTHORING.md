@@ -65,3 +65,8 @@ export { getPack, listPackIds } from "./packs/registry.ts";
 ```
 
 Unknown pack ids must fail closed: `getPack` returns `null` plus a reason string, never a guessed pack.
+
+## Reference packs
+
+- [BAKKEN.md](BAKKEN.md) — full Bakken / Williston lifecycle lens on NDIC GIS
+- [DUC-QUEUE.md](DUC-QUEUE.md) — same NDIC substrate; DUC / NC completion-readiness lens (`bakken-duc`)

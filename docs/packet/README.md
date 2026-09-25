@@ -83,8 +83,10 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 | `validate.ts` | Fail-closed `validateDomainPack` / `validateIssuePacket` |
 | `index.ts` | Public exports |
 | `packs/bakken.ts` | Bakken / Williston domain pack |
+| `packs/duc-queue.ts` | Bakken DUC queue pack (`bakken-duc`) |
 | `packs/registry.ts` | Static pack map; `getPack` / `listPackIds` |
-| `fixtures/example-bakken-issue.ts` | STOP + valid OPEN examples |
+| `fixtures/example-bakken-issue.ts` | Bakken STOP + valid OPEN examples |
+| `fixtures/example-duc-queue-issue.ts` | DUC queue STOP + valid OPEN examples |
 | `roles.ts` | Runtime propose / evaluate / open paths |
 | `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain) |
 | `packet.test.ts` | Node test suite |
@@ -95,4 +97,4 @@ We do **not** claim shared control of vendor products, live pad telemetry, or af
 ./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts
 ```
 
-See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).
+See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [DUC-QUEUE.md](DUC-QUEUE.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).

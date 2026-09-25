@@ -3,6 +3,7 @@
  * Power of 10: no recursion, bounded list, fail-closed unknown ids.
  */
 import { BAKKEN_PACK } from "./bakken.ts";
+import { DUC_QUEUE_PACK } from "./duc-queue.ts";
 import type { DomainPack } from "../types.ts";
 
 /** Hard upper bound on registered packs (Power of 10). */
@@ -10,6 +11,7 @@ export const MAX_REGISTERED_PACKS = 16;
 
 const PACK_BY_ID: Readonly<Record<string, DomainPack>> = {
   bakken: BAKKEN_PACK,
+  "bakken-duc": DUC_QUEUE_PACK,
 };
 
 export type PackLookupOk = { ok: true; pack: DomainPack };
