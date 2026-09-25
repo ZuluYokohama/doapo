@@ -596,6 +596,17 @@ function WellDetail({ well }: { well: WellRow | null }) {
       <h2 className="mt-1 text-xl font-medium text-fg">{well.wellName ?? "Unnamed well"}</h2>
       <p className="mt-1 text-sm text-muted">{well.operator ?? "Unknown operator"}</p>
       <p className="mt-3 text-sm leading-relaxed text-fg">{outcomeSentence(well)}</p>
+      {well.api ? (
+        <p className="mt-3">
+          <Link
+            to="/packet"
+            search={{ mode: "live", api: well.api }}
+            className="inline-flex h-11 items-center rounded-md border border-line bg-raised px-3 text-sm text-fg"
+          >
+            Open packet
+          </Link>
+        </p>
+      ) : null}
       <ol className="mt-4 grid grid-cols-3 gap-2">
         {steps.map((step) => (
           <li

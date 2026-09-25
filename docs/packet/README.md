@@ -87,12 +87,19 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `fixtures/example-duc-queue-issue.ts` | DUC queue STOP + valid OPEN examples |
 | `roles.ts` | Runtime propose / evaluate / open paths |
 | `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain) |
+| `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet (fail-closed) |
 | `packet.test.ts` | Node test suite |
+| `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
+
+
+## Live well binding
+
+`from-well.ts` binds a live NDIC `WellRow` into an issue packet: measured facts only (no invented oil/gas/water volumes), `outcomeClassId` from `outcomeOf(status)` when that class is on the pack, residue copied from `pack.residueDefaults`. The `/packet` UI toggles **Fixtures | Live well** and may deep-link with `?mode=live&api=…`. See [NEXT.md](NEXT.md).
 
 ## How to run tests
 
 ```bash
-./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts
+./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts
 ```
 
 See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [DUC-QUEUE.md](DUC-QUEUE.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).
