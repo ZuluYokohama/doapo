@@ -17,8 +17,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Pack import JSON | Import a domain pack from bounded JSON (validate + session overlay; static registry unchanged) | **OPEN** (landed) |
 | Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | **OPEN** (landed) |
 | Evidence bundle import | Parse + verify exported JSON (digest/chain) into working packet | **OPEN** (landed) |
-| Residue editor UI | Edit residue items on /packet before open | **OPEN** (this PR) |
-| Batch well kill scan | Scan N wells for kill facts / status rules | **STOP** |
+| Residue editor UI | Edit residue items on /packet before open | **OPEN** (landed) |
+| Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (this PR) |
+| Cross-pack kill audit | Same well set scanned across ≥2 packs; compare hit tables | **STOP** |
+| Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -93,10 +95,18 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet`: paste or file **Import evidence** → load packet into working state
 - Demo artifact — not durable authority; humans still own OPEN
 
-## Residue editor UI — OPEN (this PR)
+## Residue editor UI — OPEN (landed)
 
 - `residue-edit.ts`: `setResidueItem` / `addResidueItem` / `removeResidueItem` (fail-closed)
 - Cap `MAX_RESIDUE_ITEMS`; empty statement rejected; evidence enum checked; text bounds
 - `set` replaces by id; `add` appends (duplicate id / full → fail); `remove` drops by id
 - `/packet`: **Residue editor** strip lists items (bounded); apply / add / remove update working packet used by validate / evaluate / open / export
 - `evaluatePacket` + kill gate unchanged; residue still drives RESIDUE verdict when non-empty
+
+## Batch well kill scan — OPEN (this PR)
+
+- `kill-scan.ts`: `scanWellsForKills` + `listKillScanHits` (fail-closed)
+- Cap `MAX_KILL_SCAN_WELLS` (64); only `buildPacketFromWell` → `checkKillConditions` (no invented volumes)
+- Result rows: `{ subjectId, wellLabel, hit, killId?, reason? }`; build/check failures record `reason`
+- `/packet` live mode + wells register: **Batch kill scan** button over current search results; hit table
+- Named next STOP: cross-pack kill audit; outcome cohort summary

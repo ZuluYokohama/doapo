@@ -45,6 +45,15 @@ export {
 } from "./kill-check.ts";
 
 export {
+  MAX_KILL_SCAN_WELLS,
+  scanWellsForKills,
+  listKillScanHits,
+  type KillScanRow,
+  type ScanWellsForKillsInput,
+  type ScanWellsForKillsResult,
+} from "./kill-scan.ts";
+
+export {
   setAdvisorAnswer,
   allowedAnswerRoles,
   listAdvisorChecksForUi,
