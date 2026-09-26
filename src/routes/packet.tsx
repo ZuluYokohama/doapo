@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { PacketInspector } from "@/components/packet-inspector";
+import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
 import {
   exampleAgentSelfOpenStop,
   exampleHumanOpenCandidate,
@@ -445,6 +446,7 @@ function downloadJsonFile(json: string, filename: string): void {
 }
 
 
+
 function KillCheckStrip({
   packId,
   packet,
@@ -726,6 +728,10 @@ function PacketPage() {
   >(null);
   const [liveRuntimePacket, setLiveRuntimePacket] =
     useState<IssuePacket | null>(null);
+  const [answerDraft, setAnswerDraft] = useState<{
+    key: string;
+    packet: IssuePacket;
+  } | null>(null);
 
   useEffect(() => {
     const loaded = loadSessionLedger();
@@ -880,7 +886,16 @@ function PacketPage() {
 
   function runFixtureRuntime() {
     const base = loadSessionLedger().ledger;
-    const demo = buildRuntimeDemo(exampleHumanOpenCandidate(), base);
+    const seed =
+      answerDraft !== null && answerDraft.packet.packId.length > 0
+        ? {
+            ...answerDraft.packet,
+            measuredFacts: answerDraft.packet.measuredFacts.slice(),
+            advisorAnswers: answerDraft.packet.advisorAnswers.slice(),
+            residue: answerDraft.packet.residue.slice(),
+          }
+        : exampleHumanOpenCandidate();
+    const demo = buildRuntimeDemo(seed, base);
     persistLedger(demo.ledger);
     setFixtureRuntimeSteps(demo.steps);
     setFixtureRuntimePacket(demo.packet);
@@ -889,7 +904,17 @@ function PacketPage() {
   function runLiveRuntimePath() {
     if (!livePacket) return;
     const base = loadSessionLedger().ledger;
-    const demo = buildRuntimeDemo(livePacket, base);
+    const seed =
+      answerDraft !== null &&
+      answerDraft.packet.subjectId === livePacket.subjectId
+        ? {
+            ...answerDraft.packet,
+            measuredFacts: answerDraft.packet.measuredFacts.slice(),
+            advisorAnswers: answerDraft.packet.advisorAnswers.slice(),
+            residue: answerDraft.packet.residue.slice(),
+          }
+        : livePacket;
+    const demo = buildRuntimeDemo(seed, base);
     persistLedger(demo.ledger);
     setLiveRuntimeSteps(demo.steps);
     setLiveRuntimePacket(demo.packet);
@@ -920,12 +945,39 @@ function PacketPage() {
     return exampleHumanOpenCandidate();
   }, [fixtureId, fixtureRuntimePacket]);
 
-  const packet: IssuePacket | null =
+  const sourcePacket: IssuePacket | null =
     pageMode === "live"
       ? runLiveRuntime && liveRuntimePacket
         ? liveRuntimePacket
         : livePacket
       : fixturePacket;
+
+  const sourceKey =
+    pageMode === "live"
+      ? "live|" +
+        packId +
+        "|" +
+        (selected ? wellSubjectId(selected) : "") +
+        "|" +
+        (runLiveRuntime ? "rt" : "base") +
+        "|" +
+        (liveRuntimePacket ? liveRuntimePacket.subjectId : "")
+      : "fix|" +
+        fixtureId +
+        "|" +
+        (fixtureRuntimePacket ? fixtureRuntimePacket.subjectId : "");
+
+  const packet: IssuePacket | null =
+    answerDraft !== null &&
+    answerDraft.key === sourceKey &&
+    sourcePacket !== null
+      ? answerDraft.packet
+      : sourcePacket;
+
+  function applyWorkingPacket(next: IssuePacket) {
+    console.assert(next !== null && next !== undefined, "working packet");
+    setAnswerDraft({ key: sourceKey, packet: next });
+  }
 
   const historySubjectId: string | null = (() => {
     if (packet && packet.subjectId.length > 0) return packet.subjectId;
@@ -939,6 +991,7 @@ function PacketPage() {
   );
 
   const inspectorPackLookup = packet ? lookupPack(packet.packId) : packLookup;
+  const answerPackLookup = packet ? lookupPack(packet.packId) : packLookup;
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6">
@@ -1089,6 +1142,15 @@ function PacketPage() {
           <p className="mb-4 text-sm text-accent" role="alert">
             fail-closed — {exportError}
           </p>
+        ) : null}
+        {packet &&
+        answerPackLookup.ok &&
+        validation !== null ? (
+          <AdvisorAnswersStrip
+            pack={answerPackLookup.pack}
+            packet={packet}
+            onPacket={applyWorkingPacket}
+          />
         ) : null}
         <KillCheckStrip
           packId={packet ? packet.packId : null}

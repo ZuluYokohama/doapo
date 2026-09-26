@@ -45,6 +45,14 @@ export {
 } from "./kill-check.ts";
 
 export {
+  setAdvisorAnswer,
+  allowedAnswerRoles,
+  listAdvisorChecksForUi,
+  findAdvisorAnswer,
+  type SetAdvisorAnswerResult,
+} from "./advisor-answer.ts";
+
+export {
   MAX_EVAL_REASONS,
   proposePacket,
   evaluatePacket,

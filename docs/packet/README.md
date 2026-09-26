@@ -93,6 +93,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
+| `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 
@@ -108,6 +109,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Kill-condition runtime
 
 `kill-check.ts` evaluates pack `killConditions` against packet measured facts. A kill hits when a fact key equals `kill.id` or `kill:<id>` with value `triggered`. `evaluatePacket` applies `applyKillGate` last so a triggered kill forces STOP / FAIL. See [NEXT.md](NEXT.md).
+
+## Advisor answer UI
+
+`advisor-answer.ts` lets human/evaluator fill pack `advisorChecks` on a working packet before open. `/packet` lists checks (bounded), constrains roles, fail-closes empty answers, and feeds validate / evaluate / open / export. See [NEXT.md](NEXT.md).
 
 ## How to run tests
 
