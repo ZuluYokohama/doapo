@@ -39,6 +39,7 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **Outcome cohort summary:** capped well→packet→outcomeClassId counts; cohort table on `/packet` live + wells
 - **Kill fact authoring:** toggle pack killConditions → measured `kill:<id>=triggered` on `/packet` working packet
 - **Cohort export JSON:** download fail-closed cohort summary (schemaVersion + digest) from wells + `/packet` live strips
+- **Cohort export import:** paste/file load on cohort strips; verify schemaVersion + digest into inspector view
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 

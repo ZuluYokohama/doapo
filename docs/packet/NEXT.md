@@ -22,8 +22,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (landed) |
 | Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (landed) |
 | Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **OPEN** (landed) |
-| Cohort export JSON | Download fail-closed cohort summary artifact from current search | **OPEN** (this PR) |
-| Cohort export import | Parse + verify cohort JSON digest into inspector view | **STOP** |
+| Cohort export JSON | Download fail-closed cohort summary artifact from current search | **OPEN** (landed) |
+| Cohort export import | Parse + verify cohort JSON digest into inspector view | **OPEN** (this PR) |
 | Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
@@ -139,10 +139,18 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet`: **Kill fact authoring** strip lists pack `killConditions` with Triggered toggle → working packet
 - Feeds kill check / evaluate / cross-pack audit
 
-## Cohort export JSON — OPEN (this PR)
+## Cohort export JSON — OPEN (landed)
 
 - `cohort-export.ts`: `exportOutcomeCohort` + `cohortFilename` (fail-closed)
 - Delegates counts to `summarizeOutcomeCohort`; bundle: schemaVersion, packId/packVersion, total, byClass, unmatched, skipped, notes, bundleDigest
 - Download name `outcome-cohort-<packId>.json` (sanitized, truncated)
 - Cohort strips (wells + `/packet` live): **Export JSON** button beside Summarize
+- Demo artifact — not durable authority; humans still own OPEN
+
+## Cohort export import — OPEN (this PR)
+
+- `cohort-export.ts`: `importOutcomeCohort` (fail-closed)
+- Cap `MAX_COHORT_JSON_CHARS`; guarded `JSON.parse`; schemaVersion check; recompute `bundleDigest` (mismatch → fail)
+- Shape: packId/packVersion, total/unmatched/skipped non-neg ints, byClass ≤ `MAX_OUTCOME_CLASSES`
+- Cohort strips (wells + `/packet` live): paste or file **Import JSON** → inspector table
 - Demo artifact — not durable authority; humans still own OPEN
