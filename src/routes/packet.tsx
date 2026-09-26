@@ -3,6 +3,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { PacketInspector } from "@/components/packet-inspector";
 import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
 import { ResidueEditorStrip } from "@/components/residue-editor-strip";
+import { KillFactAuthoringStrip } from "@/components/kill-fact-authoring-strip";
 import { BatchKillScanStrip } from "@/components/batch-kill-scan-strip";
 import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
 import { CrossPackKillAuditStrip } from "@/components/cross-pack-kill-audit-strip";
@@ -1803,6 +1804,15 @@ function PacketPage() {
         ) : null}
         {packet && validation !== null ? (
           <ResidueEditorStrip
+            packet={packet}
+            onPacket={applyWorkingPacket}
+          />
+        ) : null}
+        {packet &&
+        answerPackLookup.ok &&
+        validation !== null ? (
+          <KillFactAuthoringStrip
+            pack={answerPackLookup.pack}
             packet={packet}
             onPacket={applyWorkingPacket}
           />
