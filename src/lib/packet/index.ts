@@ -104,6 +104,21 @@ export {
 } from "./kill-audit.ts";
 
 export {
+  KILL_AUDIT_SCHEMA_VERSION,
+  DEFAULT_KILL_AUDIT_EXPORT_NOTES,
+  MAX_KILL_AUDIT_JSON_CHARS,
+  exportKillAudit,
+  importKillAudit,
+  killAuditFilename,
+  type KillAuditBundle,
+  type ExportKillAuditResult,
+  type ExportKillAuditInput,
+  type ImportKillAuditResult,
+  type ImportKillAuditOk,
+  type ImportKillAuditErr,
+} from "./kill-audit-export.ts";
+
+export {
   setAdvisorAnswer,
   allowedAnswerRoles,
   listAdvisorChecksForUi,
