@@ -20,8 +20,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Residue editor UI | Edit residue items on /packet before open | **OPEN** (landed) |
 | Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (landed) |
 | Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (landed) |
-| Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (this PR) |
-| Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **STOP** |
+| Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (landed) |
+| Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **OPEN** (this PR) |
 | Cohort export JSON | Download fail-closed cohort summary artifact from current search | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
@@ -121,11 +121,18 @@ STOP rows are named next candidates only — not committed scope.
 - Result rows: `{ packId, packVersion, hit, killId?, reason? }`
 - `/packet`: **Cross-pack kill audit** strip when packet validates; full pack table + hit count
 
-## Outcome cohort summary — OPEN (this PR)
+## Outcome cohort summary — OPEN (landed)
 
 - `outcome-cohort.ts`: `summarizeOutcomeCohort` (fail-closed)
 - Cap `MAX_COHORT_WELLS` (64, aligned with kill scan); invalid cap / missing pack/wells → fail
 - Path: `buildPacketFromWell` → `outcomeClassId` (outcomeOf + pack membership); no invented volumes
 - Result: `{ ok, total, byClass: { id, label, count }[], unmatched, skipped }`
 - `/packet` live + wells register: **Cohort summary** table from current search results
-- Named next STOP: kill fact authoring UI; cohort export JSON
+
+## Kill fact authoring UI — OPEN (this PR)
+
+- `kill-fact-edit.ts`: `setKillTriggered` / `isKillTriggered` / `killFactKey` / `listKillConditionsForUi` (fail-closed)
+- Preferred measured key `kill:<id>` with value `KILL_TRIGGER_VALUE` (`triggered`); clear removes matching bare/`kill:` facts
+- Cap `MAX_MEASURED_FACTS` (packet); aware of `MAX_WELL_FACTS` (from-well builder only)
+- `/packet`: **Kill fact authoring** strip lists pack `killConditions` with Triggered toggle → working packet
+- Feeds kill check / evaluate / cross-pack audit; named next STOP: cohort export JSON

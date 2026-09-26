@@ -92,6 +92,14 @@ export {
 } from "./residue-edit.ts";
 
 export {
+  killFactKey,
+  isKillTriggered,
+  setKillTriggered,
+  listKillConditionsForUi,
+  type KillFactEditResult,
+} from "./kill-fact-edit.ts";
+
+export {
   MAX_EVAL_REASONS,
   proposePacket,
   evaluatePacket,
