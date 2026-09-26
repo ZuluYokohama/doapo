@@ -15,7 +15,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Advisor answer UI | Human/evaluator fill advisorChecks on `/packet` before open | **OPEN** (landed) |
 | Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | **OPEN** (landed) |
 | Pack import JSON | Import a domain pack from bounded JSON (validate + session overlay; static registry unchanged) | **OPEN** (landed) |
-| Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | **OPEN** (this PR) |
+| Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | **OPEN** (landed) |
+| Evidence bundle import | Parse + verify exported JSON (digest/chain) into working packet | **OPEN** (this PR) |
+| Residue editor UI | Edit residue items on /packet before open | **STOP** |
+| Batch well kill scan | Scan N wells for kill facts / status rules | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -73,11 +76,20 @@ STOP rows are named next candidates only — not committed scope.
 - Static registry is **not** mutated — imported pack is session/UI overlay only
 - `/packet`: paste or file load; select imported id for live well build / kill / advisor
 
-## Multi-subject export zip — OPEN (this PR)
+## Multi-subject export zip — OPEN (landed)
 
 - `evidence-zip.ts`: `exportMultiSubjectEvidenceZip` + STORE-only `buildStoreZip`
 - Cap `MAX_EXPORT_SUBJECTS` (≤16); `exportPacketEvidence` per subject; fail-closed on empty / over-cap / duplicate / any subject failure
 - Zip includes `manifest.json` (subject digests, tip, `ledgerChainOk`, `manifestDigest`) + per-subject evidence JSON
 - `/packet`: **Multi-subject export zip** strip (fixture + current subject checkboxes)
+- Demo artifact — not durable authority; humans still own OPEN
+
+## Evidence bundle import — OPEN (this PR)
+
+- `evidence-export.ts`: `importEvidenceBundle` parses + verifies a freeze artifact
+- Cap `MAX_EVIDENCE_JSON_CHARS`; schemaVersion check; recompute `bundleDigest` (mismatch → fail)
+- Pack resolve via `resolvePack` / registry; `validateIssuePacket` required
+- Optional: per-seal digest verify when `bundle.seals` present (subject-filtered; not full chain)
+- `/packet`: paste or file **Import evidence** → load packet into working state
 - Demo artifact — not durable authority; humans still own OPEN
 

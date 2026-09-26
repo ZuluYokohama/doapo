@@ -91,7 +91,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain, subject list) |
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
-| `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
+| `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence` / `importEvidenceBundle`) |
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
@@ -105,9 +105,9 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 
 `from-well.ts` binds a live NDIC `WellRow` into an issue packet: measured facts only (no invented oil/gas/water volumes), `outcomeClassId` from `outcomeOf(status)` when that class is on the pack, residue copied from `pack.residueDefaults`. The `/packet` UI toggles **Fixtures | Live well** and may deep-link with `?mode=live&api=…`. See [NEXT.md](NEXT.md).
 
-## Evidence export
+## Evidence export / import
 
-`evidence-export.ts` builds a downloadable freeze artifact: validated packet, subject-scoped seals, ledger tip, full-ledger `chainOk`, and `bundleDigest`. `/packet` offers **Export evidence** when a validated packet is in view. Demo artifact from the session ledger — **not durable authority**; humans still own OPEN. See [NEXT.md](NEXT.md) and [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
+`evidence-export.ts` builds a downloadable freeze artifact: validated packet, subject-scoped seals, ledger tip, full-ledger `chainOk`, and `bundleDigest`. `/packet` offers **Export evidence** when a validated packet is in view. `importEvidenceBundle` parses the same JSON (bounded), recomputes `bundleDigest`, resolves the pack, validates the packet, and optionally verifies seal digests — loading the packet into `/packet` working state. Demo artifact — **not durable authority**; humans still own OPEN. See [NEXT.md](NEXT.md) and [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
 
 ## Kill-condition runtime
 

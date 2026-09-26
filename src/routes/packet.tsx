@@ -23,6 +23,8 @@ import {
   evidenceFilename,
   exportPacketEvidence,
   exportMultiSubjectEvidenceZip,
+  importEvidenceBundle,
+  MAX_EVIDENCE_JSON_CHARS,
   MAX_EXPORT_SUBJECTS,
   listPackIds,
   listRecentSeals,
@@ -575,6 +577,122 @@ function EvidenceExportStrip({
   );
 }
 
+
+function EvidenceImportStrip({
+  imported,
+  importError,
+  pasteDraft,
+  onPasteDraft,
+  onImportText,
+  onClear,
+}: {
+  imported: IssuePacket | null;
+  importError: string | null;
+  pasteDraft: string;
+  onPasteDraft: (value: string) => void;
+  onImportText: (text: string) => void;
+  onClear: () => void;
+}) {
+  function onFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const files = input.files;
+    if (!files || files.length < 1) return;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      onImportText(value);
+      input.value = "";
+    };
+    reader.onerror = () => {
+      onImportText("");
+      input.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function onPasteSubmit(event: FormEvent) {
+    event.preventDefault();
+    onImportText(pasteDraft);
+  }
+
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Evidence import
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Paste or load an exported evidence JSON freeze artifact. Fail-closed
+        parse, schema, bundleDigest, pack resolve, packet validate, and optional
+        seal digest verify (cap {MAX_EVIDENCE_JSON_CHARS} chars). Loads the
+        packet into working state — demo only; humans still own OPEN.
+      </p>
+      <form onSubmit={onPasteSubmit} className="mt-3 space-y-2">
+        <label className="block text-xs tracking-wide text-muted uppercase">
+          Paste evidence JSON
+          <textarea
+            value={pasteDraft}
+            onChange={(event) => onPasteDraft(event.target.value)}
+            rows={4}
+            spellCheck={false}
+            className="mt-1 w-full rounded-md border border-line bg-bg px-3 py-2 font-mono text-xs text-fg"
+            placeholder='{"schemaVersion":"doapo-packet-evidence/1",…}'
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+          >
+            Import evidence
+          </button>
+          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg">
+            Load file
+            <input
+              type="file"
+              accept="application/json,.json,text/plain"
+              onChange={onFileChange}
+              className="sr-only"
+            />
+          </label>
+          {imported ? (
+            <button
+              type="button"
+              onClick={() => onClear()}
+              className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+            >
+              Clear evidence import
+            </button>
+          ) : null}
+        </div>
+      </form>
+      {importError ? (
+        <p className="mt-3 text-sm text-accent" role="alert">
+          fail-closed — {importError}
+        </p>
+      ) : null}
+      {imported ? (
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-muted uppercase">Subject</dt>
+            <dd className="font-mono text-fg">{imported.subjectId}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted uppercase">Pack</dt>
+            <dd className="font-mono text-fg">{imported.packId}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted uppercase">Gate</dt>
+            <dd className="font-mono text-fg">{imported.gate}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No imported evidence in session.</p>
+      )}
+    </section>
+  );
+}
+
 type MultiSubjectOption = {
   id: string;
   label: string;
@@ -1056,6 +1174,13 @@ function PacketPage() {
   const [importedPack, setImportedPack] = useState<DomainPack | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importPaste, setImportPaste] = useState("");
+  const [importedEvidence, setImportedEvidence] = useState<IssuePacket | null>(
+    null,
+  );
+  const [evidenceImportError, setEvidenceImportError] = useState<string | null>(
+    null,
+  );
+  const [evidenceImportPaste, setEvidenceImportPaste] = useState("");
 
   useEffect(() => {
     const session = loadSessionLedger();
@@ -1239,6 +1364,37 @@ function PacketPage() {
     });
   }
 
+  function applyImportedEvidence(raw: string) {
+    if (raw.length === 0) {
+      setEvidenceImportError("text empty");
+      return;
+    }
+    const result = importEvidenceBundle(raw, importedPack);
+    if (!result.ok) {
+      setEvidenceImportError(result.reason);
+      return;
+    }
+    setImportedEvidence(result.packet);
+    setEvidenceImportError(null);
+    setEvidenceImportPaste("");
+    setAnswerDraft(null);
+    setFixtureRuntimeSteps(null);
+    setFixtureRuntimePacket(null);
+    setPageMode("fixtures");
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: "fixtures",
+      }),
+    });
+  }
+
+  function clearImportedEvidence() {
+    setImportedEvidence(null);
+    setEvidenceImportError(null);
+    setEvidenceImportPaste("");
+  }
+
   const liveBuilt = useMemo(() => {
     if (pageMode !== "live") return null;
     if (!selected) return null;
@@ -1340,6 +1496,8 @@ function PacketPage() {
   }
 
   function selectFixture(id: FixtureId) {
+    setImportedEvidence(null);
+    setEvidenceImportError(null);
     setFixtureId(id);
     if (id === "runtime") {
       runFixtureRuntime();
@@ -1364,26 +1522,30 @@ function PacketPage() {
   }, [fixtureId, fixtureRuntimePacket]);
 
   const sourcePacket: IssuePacket | null =
-    pageMode === "live"
-      ? runLiveRuntime && liveRuntimePacket
-        ? liveRuntimePacket
-        : livePacket
-      : fixturePacket;
+    importedEvidence !== null
+      ? importedEvidence
+      : pageMode === "live"
+        ? runLiveRuntime && liveRuntimePacket
+          ? liveRuntimePacket
+          : livePacket
+        : fixturePacket;
 
   const sourceKey =
-    pageMode === "live"
-      ? "live|" +
-        packId +
-        "|" +
-        (selected ? wellSubjectId(selected) : "") +
-        "|" +
-        (runLiveRuntime ? "rt" : "base") +
-        "|" +
-        (liveRuntimePacket ? liveRuntimePacket.subjectId : "")
-      : "fix|" +
-        fixtureId +
-        "|" +
-        (fixtureRuntimePacket ? fixtureRuntimePacket.subjectId : "");
+    importedEvidence !== null
+      ? "evidence|" + importedEvidence.subjectId
+      : pageMode === "live"
+        ? "live|" +
+          packId +
+          "|" +
+          (selected ? wellSubjectId(selected) : "") +
+          "|" +
+          (runLiveRuntime ? "rt" : "base") +
+          "|" +
+          (liveRuntimePacket ? liveRuntimePacket.subjectId : "")
+        : "fix|" +
+          fixtureId +
+          "|" +
+          (fixtureRuntimePacket ? fixtureRuntimePacket.subjectId : "");
 
   const packet: IssuePacket | null =
     answerDraft !== null &&
@@ -1638,6 +1800,14 @@ function PacketPage() {
           ledger={sessionLedger}
           validationOk={validation !== null && validation.ok}
           onError={setExportError}
+        />
+        <EvidenceImportStrip
+          imported={importedEvidence}
+          importError={evidenceImportError}
+          pasteDraft={evidenceImportPaste}
+          onPasteDraft={setEvidenceImportPaste}
+          onImportText={applyImportedEvidence}
+          onClear={clearImportedEvidence}
         />
         <MultiSubjectExportStrip
           options={multiExportOptions}
