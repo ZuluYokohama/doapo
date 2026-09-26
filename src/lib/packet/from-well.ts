@@ -2,6 +2,7 @@
  * Bind a live NDIC WellRow into an issue packet.
  * Power of 10: flat, bounded, asserted, no recursion, ≤60 lines/fn.
  * Fail-closed: only real WellRow fields; never invent oil/gas/water volumes.
+ * Measured DUC/status derivation (residue + kill hints) via derive-from-well.
  */
 import {
   formatApi,
@@ -9,6 +10,10 @@ import {
   outcomeOf,
   type WellRow,
 } from "../outcomes.ts";
+import {
+  deriveFromWell,
+  isAlwaysOnResidueId,
+} from "./derive-from-well.ts";
 import {
   MAX_ID_LEN,
   MAX_MEASURED_FACTS,
@@ -33,6 +38,8 @@ export type BuildPacketFromWellInput = {
   pack: DomainPack;
   proposedBy: AuthorityRole;
   gate: GateVerdict;
+  /** Injectable clock for derivation tests; omit in production. */
+  nowMs?: number;
 };
 
 export type BuildPacketResult =
@@ -111,20 +118,68 @@ export function wellToMeasuredFacts(well: WellRow): MeasuredFact[] {
   return facts;
 }
 
-function copyResidueDefaults(pack: DomainPack): ResidueItem[] {
+/**
+ * Copy always-on residueDefaults only. Conditional ids (confidential-lag, duc-age)
+ * are added by deriveFromWell when rules match.
+ */
+function copyAlwaysOnResidue(pack: DomainPack): ResidueItem[] {
   const out: ResidueItem[] = [];
   let i = 0;
   const bound = pack.residueDefaults.length;
   console.assert(bound <= MAX_RESIDUE_ITEMS, "residueDefaults in bound");
   while (i < bound && out.length < MAX_RESIDUE_ITEMS) {
     const row = pack.residueDefaults[i];
-    out.push({
-      id: row.id,
-      statement: row.statement,
-      evidence: row.evidence,
-    });
+    if (isAlwaysOnResidueId(row.id)) {
+      out.push({
+        id: row.id,
+        statement: row.statement,
+        evidence: row.evidence,
+      });
+    }
     i += 1;
   }
+  return out;
+}
+
+function appendDerivedFacts(
+  base: MeasuredFact[],
+  extra: MeasuredFact[],
+): MeasuredFact[] {
+  console.assert(Array.isArray(base), "base facts array");
+  console.assert(Array.isArray(extra), "extra facts array");
+  const out = base.slice();
+  let i = 0;
+  while (i < extra.length && out.length < MAX_MEASURED_FACTS) {
+    out.push(extra[i]);
+    i += 1;
+  }
+  console.assert(out.length <= MAX_MEASURED_FACTS, "merged facts bounded");
+  return out;
+}
+
+function mergeResidue(
+  alwaysOn: ResidueItem[],
+  derived: ResidueItem[],
+): ResidueItem[] {
+  console.assert(Array.isArray(alwaysOn), "alwaysOn array");
+  console.assert(Array.isArray(derived), "derived array");
+  const out = alwaysOn.slice();
+  let i = 0;
+  while (i < derived.length && out.length < MAX_RESIDUE_ITEMS) {
+    const row = derived[i];
+    let dup = false;
+    let j = 0;
+    while (j < out.length) {
+      if (out[j].id === row.id) {
+        dup = true;
+        break;
+      }
+      j += 1;
+    }
+    if (!dup) out.push(row);
+    i += 1;
+  }
+  console.assert(out.length <= MAX_RESIDUE_ITEMS, "merged residue bounded");
   return out;
 }
 
@@ -182,7 +237,6 @@ function subjectFromWell(well: WellRow): { id: string; label: string } | null {
   return null;
 }
 
-
 /**
  * Stable packet subject id for a well (same algorithm as buildPacketFromWell).
  * Fail-closed: null when api and fileNo are both missing/empty.
@@ -197,7 +251,8 @@ export function wellSubjectId(well: WellRow): string | null {
 
 /**
  * Build an issue packet from a live NDIC well + domain pack.
- * Residue defaults are copied from the pack. No invented volumes.
+ * Always-on residue from pack; measured derivation adds conditional residue / kill hints.
+ * No invented volumes.
  */
 export function buildPacketFromWell(
   input: BuildPacketFromWellInput,
@@ -213,9 +268,19 @@ export function buildPacketFromWell(
   if (subject === null) {
     return fail("well missing api and fileNo — fail-closed");
   }
-  const measuredFacts = wellToMeasuredFacts(input.well);
-  const residue = copyResidueDefaults(input.pack);
+  const baseFacts = wellToMeasuredFacts(input.well);
+  const derived = deriveFromWell({
+    well: input.well,
+    pack: input.pack,
+    nowMs: input.nowMs,
+  });
+  const measuredFacts = appendDerivedFacts(baseFacts, derived.facts);
+  const residue = mergeResidue(copyAlwaysOnResidue(input.pack), derived.residue);
   const outcomeClassId = resolveOutcomeClassId(input.well, input.pack);
+  const notes =
+    derived.facts.length > 0 || derived.residue.length > 0
+      ? "built from live NDIC well row + measured derivation"
+      : "built from live NDIC well row";
   const packet: IssuePacket = {
     schemaVersion: PACKET_SCHEMA_VERSION,
     packId: input.pack.id,
@@ -233,7 +298,7 @@ export function buildPacketFromWell(
     residue,
     proposedBy: input.proposedBy,
     gate: input.gate,
-    notes: "built from live NDIC well row",
+    notes,
   };
   return { ok: true, packet };
 }

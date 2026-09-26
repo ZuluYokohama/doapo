@@ -26,7 +26,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Cohort export import | Parse + verify cohort JSON digest into inspector view | **OPEN** (landed) |
 | Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **OPEN** (landed) |
 | Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **OPEN** (landed) |
-| Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **OPEN** (this PR) |
+| Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **OPEN** (landed) |
+| Measured DUC/status derivation | Derive residue / kill hints from live WellRow (status, spud age); wire into `/packet` live build | **OPEN** (this PR) |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -173,7 +174,7 @@ STOP rows are named next candidates only — not committed scope.
 - Kill scan strips (wells + `/packet` live): paste or file **Import JSON** → inspector table
 - Demo artifact — not durable authority; humans still own OPEN
 
-## Cross-pack kill audit export JSON — OPEN (this PR)
+## Cross-pack kill audit export JSON — OPEN (landed)
 
 - `kill-audit-export.ts`: `exportKillAudit` + `killAuditFilename` + `importKillAudit` (fail-closed)
 - Delegates audit to `auditKillsAcrossPacks`; bundle: schemaVersion, subjectId, packetPackId, audited, hitCount, rows, notes, bundleDigest
@@ -181,3 +182,18 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet` cross-pack kill audit strip: **Export JSON** button beside Audit packs
 - `importKillAudit` verifies schemaVersion + recomputed digest (for any future import UI); no invented volumes
 - Demo artifact — not durable authority; humans still own OPEN
+
+
+## Measured DUC/status derivation — OPEN (this PR)
+
+- `derive-from-well.ts`: `deriveFromWell` + `daysSinceSpud` (fail-closed)
+- Rules from real `WellRow` fields only: Confidential → `confidential-lag` residue; NC + `days-since-spud` ≥ `DUC_AGE_DAYS_THRESHOLD` (365) → `duc-age` residue; bakken-duc pack kill `stale-duc` → measured `kill:stale-duc=triggered`
+- Emits derived fact `days-since-spud` when spud present; evidence `derived`; source `NDIC GIS derived`
+- `from-well.ts` / `buildPacketFromWell`: always-on residueDefaults + derived residue/facts (conditional ids not blind-copied)
+- `/packet` live build path inherits derivation automatically; kill-fact authoring remains for overrides
+- Fail-closed; **no invented oil/gas/water volumes**; no NexTier / Patterson-UTI / arena marketing in product copy
+- **Direction: info → value** (Technical Sales Rep NEX / Williston intent). **Freeze:** do **not** add another export/import STOP gate
+
+## Freeze — no more export/import STOP strips
+
+Named next candidates after this gate must not invent another export/import artifact strip. Prefer measured derivation, status→value rules, and pack/substrate honesty over freeze-JSON churn.

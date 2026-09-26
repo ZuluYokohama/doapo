@@ -41,6 +41,12 @@ Primary queue signal: **NC → `duc`**. Adjacent classes sit upstream / beside c
 | `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
 | `gate-authority` | Gate authority defined by pack schema |
 | `shared-ndic-different-lens` | Same NDIC substrate as `bakken`; different resolution lens |
+| `duc-age` | **Conditional** — NC + measured days-since-spud ≥ pack threshold (365) |
+| `confidential-lag` | **Conditional** — Confidential / sealed status lag |
+
+## Measured derivation
+
+`derive-from-well.ts` (via `buildPacketFromWell`) maps live `WellRow` status/spud into residue and kill hints. No invented volumes. Live `/packet` packets get derivation without requiring the kill-authoring toggle (toggle remains for overrides).
 
 ## Public sources
 
@@ -48,4 +54,4 @@ Same NDIC / DMR public oil & gas resources as Bakken (measured substrate).
 
 ## Kills
 
-`unverified-org-claim`, `invented-volumes`, `agent-self-open`, `external-doc-as-sop`.
+`unverified-org-claim`, `invented-volumes`, `agent-self-open`, `external-doc-as-sop`, `stale-duc` (auto-hint when aged NC meets threshold).

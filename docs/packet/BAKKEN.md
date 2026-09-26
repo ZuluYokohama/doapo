@@ -43,7 +43,11 @@ Mapped from NDIC status codes via `src/lib/outcomes.ts`:
 | `no-monthly-volumes` | Volumes not on open GIS substrate |
 | `public-docs-not-sop` | Public product / marketing pages are not field SOPs or setpoints |
 | `gate-authority` | Gate authority (evidence class, residue, kills, human-only OPEN) defined by pack schema |
-| `confidential-lag` | Statutory withhold on confidential wells |
+| `confidential-lag` | **Conditional** — statutory withhold when status is Confidential / sealed |
+
+## Measured derivation
+
+`derive-from-well.ts` includes `confidential-lag` only when sealed, and may add `duc-age` residue for aged NC. Pack does **not** declare `stale-duc` kill (that lives on `bakken-duc`). No invented volumes.
 
 ## Public sources
 

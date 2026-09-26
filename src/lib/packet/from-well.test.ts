@@ -77,7 +77,11 @@ test("buildPacketFromWell maps NC status to duc on bakken pack", () => {
   if (!built.ok) return;
   assert.equal(built.packet.outcomeClassId, "duc");
   assert.equal(built.packet.packId, BAKKEN_PACK.id);
-  assert.equal(built.packet.residue.length, BAKKEN_PACK.residueDefaults.length);
+  // Always-on residue only; confidential-lag / duc-age are rule-gated.
+  assert.ok(built.packet.residue.length >= 1);
+  assert.ok(
+    built.packet.residue.some((row) => row.id === "no-monthly-volumes"),
+  );
   const validation = validateIssuePacket(built.packet);
   assert.equal(validation.ok, true);
 });

@@ -235,6 +235,22 @@ export {
 } from "./from-well.ts";
 
 export {
+  DUC_AGE_DAYS_THRESHOLD,
+  MS_PER_DAY,
+  DERIVE_SOURCE_LABEL,
+  RESIDUE_ID_CONFIDENTIAL_LAG,
+  RESIDUE_ID_DUC_AGE,
+  KILL_ID_STALE_DUC,
+  FACT_KEY_DAYS_SINCE_SPUD,
+  CONDITIONAL_RESIDUE_IDS,
+  daysSinceSpud,
+  deriveFromWell,
+  isAlwaysOnResidueId,
+  type DeriveFromWellInput,
+  type DeriveFromWellResult,
+} from "./derive-from-well.ts";
+
+export {
   EVIDENCE_SCHEMA_VERSION,
   EXPORT_SEAL_CAP,
   DEFAULT_EXPORT_NOTES,

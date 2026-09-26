@@ -91,6 +91,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain, subject list) |
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
+| `derive-from-well.ts` | Measured DUC/status derivation → residue + kill hints (status / spud age) |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence` / `importEvidenceBundle`) |
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
@@ -104,13 +105,18 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger-durable.ts` | Opt-in localStorage durable ledger (prefer when present) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
+| `derive-from-well.test.ts` | Derivation rules (confidential-lag, duc-age, stale-duc; no volumes) |
 | `kill-scan.test.ts` | Batch kill scan + export/importKillScan digest / bounds / fail-closed |
 | `kill-audit.test.ts` | Cross-pack kill audit + export/importKillAudit digest / bounds / fail-closed |
 
 
 ## Live well binding
 
-`from-well.ts` binds a live NDIC `WellRow` into an issue packet: measured facts only (no invented oil/gas/water volumes), `outcomeClassId` from `outcomeOf(status)` when that class is on the pack, residue copied from `pack.residueDefaults`. The `/packet` UI toggles **Fixtures | Live well** and may deep-link with `?mode=live&api=…`. See [NEXT.md](NEXT.md).
+`from-well.ts` binds a live NDIC `WellRow` into an issue packet: measured facts only (no invented oil/gas/water volumes), `outcomeClassId` from `outcomeOf(status)` when that class is on the pack, always-on residue from `pack.residueDefaults`, plus **measured derivation** from `derive-from-well.ts` (conditional residue / kill hints from status and spud age). The `/packet` UI toggles **Fixtures | Live well** and may deep-link with `?mode=live&api=…`. See [NEXT.md](NEXT.md).
+
+## Measured DUC/status derivation
+
+`deriveFromWell` emits `days-since-spud` when spud is present; adds `confidential-lag` residue for Confidential / sealed; adds `duc-age` residue when NC days ≥ `DUC_AGE_DAYS_THRESHOLD` (365); and, when the pack declares kill `stale-duc` (`bakken-duc`), sets `kill:stale-duc=triggered`. Fail-closed; no invented volumes. Live `/packet` build inherits this path; kill-fact authoring remains for overrides. **Freeze:** do not add another export/import STOP gate — prefer info→value derivation.
 
 ## Evidence export / import
 
@@ -147,7 +153,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## How to run tests
 
 ```bash
-./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts src/lib/packet/kill-scan.test.ts src/lib/packet/kill-audit.test.ts
+./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts src/lib/packet/derive-from-well.test.ts src/lib/packet/kill-scan.test.ts src/lib/packet/kill-audit.test.ts
 ```
 
 See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [DUC-QUEUE.md](DUC-QUEUE.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).

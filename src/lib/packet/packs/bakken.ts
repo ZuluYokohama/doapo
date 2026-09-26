@@ -8,7 +8,7 @@ import { PACKET_SCHEMA_VERSION, type DomainPack } from "../types.ts";
 export const BAKKEN_PACK: DomainPack = {
   schemaVersion: PACKET_SCHEMA_VERSION,
   id: "bakken",
-  version: "1.2.1",
+  version: "1.3.0",
   title: "Bakken / Williston — Dakota oil & production outcomes",
   substrate:
     "North Dakota Industrial Commission (NDIC) public GIS well index: permit, spud, and well-status outcomes.",
@@ -74,6 +74,7 @@ export const BAKKEN_PACK: DomainPack = {
         "Gate authority: evidence class, residue, kill conditions, and human-only OPEN are defined by this pack schema.",
       evidence: "derived",
     },
+    // Conditional: included by derive-from-well only when status is Confidential / sealed.
     {
       id: "confidential-lag",
       statement:
