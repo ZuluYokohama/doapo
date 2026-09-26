@@ -54,6 +54,14 @@ export {
 } from "./kill-scan.ts";
 
 export {
+  MAX_COHORT_WELLS,
+  summarizeOutcomeCohort,
+  type CohortClassCount,
+  type SummarizeOutcomeCohortInput,
+  type SummarizeOutcomeCohortResult,
+} from "./outcome-cohort.ts";
+
+export {
   MAX_AUDIT_PACKS,
   auditKillsAcrossPacks,
   auditPacketKills,

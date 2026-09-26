@@ -19,9 +19,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Evidence bundle import | Parse + verify exported JSON (digest/chain) into working packet | **OPEN** (landed) |
 | Residue editor UI | Edit residue items on /packet before open | **OPEN** (landed) |
 | Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (landed) |
-| Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (this PR) |
-| Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **STOP** |
+| Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (landed) |
+| Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (this PR) |
 | Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **STOP** |
+| Cohort export JSON | Download fail-closed cohort summary artifact from current search | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -111,7 +112,7 @@ STOP rows are named next candidates only — not committed scope.
 - Result rows: `{ subjectId, wellLabel, hit, killId?, reason? }`; build/check failures record `reason`
 - `/packet` live mode + wells register: **Batch kill scan** button over current search results; hit table
 
-## Cross-pack kill audit — OPEN (this PR)
+## Cross-pack kill audit — OPEN (landed)
 
 - `kill-audit.ts`: `auditKillsAcrossPacks` + `auditPacketKills` + `listPacksForAudit` (fail-closed)
 - Cap `MAX_AUDIT_PACKS` (= `MAX_REGISTERED_PACKS`); empty packs list → fail-closed
@@ -119,4 +120,12 @@ STOP rows are named next candidates only — not committed scope.
 - Optional session overlay: prefer matching id / append if new (`mergePacksForAudit`)
 - Result rows: `{ packId, packVersion, hit, killId?, reason? }`
 - `/packet`: **Cross-pack kill audit** strip when packet validates; full pack table + hit count
-- Named next STOP: outcome cohort summary; kill fact authoring UI
+
+## Outcome cohort summary — OPEN (this PR)
+
+- `outcome-cohort.ts`: `summarizeOutcomeCohort` (fail-closed)
+- Cap `MAX_COHORT_WELLS` (64, aligned with kill scan); invalid cap / missing pack/wells → fail
+- Path: `buildPacketFromWell` → `outcomeClassId` (outcomeOf + pack membership); no invented volumes
+- Result: `{ ok, total, byClass: { id, label, count }[], unmatched, skipped }`
+- `/packet` live + wells register: **Cohort summary** table from current search results
+- Named next STOP: kill fact authoring UI; cohort export JSON

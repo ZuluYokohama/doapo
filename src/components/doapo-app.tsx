@@ -12,6 +12,7 @@ import {
 import { RefreshCw, Search } from "lucide-react";
 import { searchWells } from "@/lib/ndic.functions";
 import { BatchKillScanStrip, resolveScanPack } from "@/components/batch-kill-scan-strip";
+import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
 import {
   UI_LEDGER_CAP,
   countSealsForSubject,
@@ -498,6 +499,13 @@ export function DoapoApp({
 
           <div className="mt-4">
             <BatchKillScanStrip
+              wells={register}
+              pack={scanPack}
+              packIds={listPackIds()}
+              packId={scanPackId}
+              onPackId={setScanPackId}
+            />
+            <OutcomeCohortStrip
               wells={register}
               pack={scanPack}
               packIds={listPackIds()}
