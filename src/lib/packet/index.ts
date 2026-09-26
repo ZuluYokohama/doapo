@@ -54,6 +54,18 @@ export {
 } from "./kill-scan.ts";
 
 export {
+  MAX_AUDIT_PACKS,
+  auditKillsAcrossPacks,
+  auditPacketKills,
+  listKillAuditHits,
+  listPacksForAudit,
+  mergePacksForAudit,
+  type KillAuditRow,
+  type AuditKillsAcrossPacksInput,
+  type AuditKillsAcrossPacksResult,
+} from "./kill-audit.ts";
+
+export {
   setAdvisorAnswer,
   allowedAnswerRoles,
   listAdvisorChecksForUi,

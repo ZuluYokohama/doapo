@@ -4,6 +4,7 @@ import { PacketInspector } from "@/components/packet-inspector";
 import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
 import { ResidueEditorStrip } from "@/components/residue-editor-strip";
 import { BatchKillScanStrip } from "@/components/batch-kill-scan-strip";
+import { CrossPackKillAuditStrip } from "@/components/cross-pack-kill-audit-strip";
 import {
   exampleAgentSelfOpenStop,
   exampleHumanOpenCandidate,
@@ -1803,6 +1804,11 @@ function PacketPage() {
         ) : null}
         <KillCheckStrip
           packId={packet ? packet.packId : null}
+          packet={packet}
+          validationOk={validation !== null && validation.ok}
+          overlayPack={importedPack}
+        />
+        <CrossPackKillAuditStrip
           packet={packet}
           validationOk={validation !== null && validation.ok}
           overlayPack={importedPack}
