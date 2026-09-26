@@ -1,10 +1,13 @@
 /**
  * Outcome cohort summary UI — counts from current well search results (capped).
  * Power of 10: bounded render lists, no recursion.
+ * Export JSON downloads a fail-closed freeze artifact (schema + digest).
  */
 import { useState } from "react";
 import {
   MAX_COHORT_WELLS,
+  cohortFilename,
+  exportOutcomeCohort,
   listPackIds,
   resolvePack,
   summarizeOutcomeCohort,
@@ -12,6 +15,18 @@ import {
   type DomainPack,
 } from "@/lib/packet";
 import type { WellRow } from "@/lib/outcomes";
+
+function downloadJsonFile(json: string, filename: string): void {
+  console.assert(json.length > 0, "download json present");
+  console.assert(filename.length > 0, "download name present");
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function OutcomeCohortStrip({
   wells,
@@ -31,12 +46,14 @@ export function OutcomeCohortStrip({
   const [unmatched, setUnmatched] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   const ids = packIds ?? listPackIds();
   const activePack = pack;
 
   function onSummarize() {
     setError(null);
+    setExportNote(null);
     if (activePack === null) {
       setError("pack required");
       setByClass(null);
@@ -63,12 +80,43 @@ export function OutcomeCohortStrip({
     setSkipped(result.skipped);
   }
 
+  function onExportJson() {
+    setError(null);
+    setExportNote(null);
+    if (activePack === null) {
+      setError("pack required");
+      return;
+    }
+    if (wells.length < 1) {
+      setError("no wells to export");
+      return;
+    }
+    const result = exportOutcomeCohort({
+      wells,
+      pack: activePack,
+      maxWells: MAX_COHORT_WELLS,
+    });
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    downloadJsonFile(result.json, cohortFilename(activePack.id));
+    setByClass(result.bundle.byClass);
+    setTotal(result.bundle.total);
+    setUnmatched(result.bundle.unmatched);
+    setSkipped(result.bundle.skipped);
+    setExportNote(
+      "exported · digest " + result.bundle.bundleDigest.slice(0, 12) + "…",
+    );
+  }
+
   const showPackSelect =
     onPackId !== undefined && packId !== undefined && ids.length > 0;
   const rows =
     byClass !== null
       ? byClass.filter((row) => row.count > 0)
       : [];
+  const canAct = wells.length >= 1 && activePack !== null;
 
   return (
     <section className="mb-4 rounded-md border border-line bg-surface p-4">
@@ -78,6 +126,7 @@ export function OutcomeCohortStrip({
       <p className="mt-2 text-sm text-muted">
         Map up to {MAX_COHORT_WELLS} current search wells to pack outcomeClassId
         via well→packet (no invented volumes). Counts per class + unmatched.
+        Export downloads a fail-closed JSON freeze (schemaVersion + digest).
       </p>
 
       {showPackSelect ? (
@@ -101,12 +150,20 @@ export function OutcomeCohortStrip({
         <button
           type="button"
           onClick={onSummarize}
-          disabled={wells.length < 1 || activePack === null}
+          disabled={!canAct}
           className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
         >
           Summarize{" "}
           {wells.length < MAX_COHORT_WELLS ? wells.length : MAX_COHORT_WELLS}{" "}
           well{wells.length === 1 ? "" : "s"}
+        </button>
+        <button
+          type="button"
+          onClick={onExportJson}
+          disabled={!canAct}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
+        >
+          Export JSON
         </button>
         <span className="font-mono text-xs text-muted">
           {wells.length} in view · cap {MAX_COHORT_WELLS}
@@ -117,6 +174,10 @@ export function OutcomeCohortStrip({
         <p className="mt-3 text-sm text-accent" role="alert">
           fail-closed — {error}
         </p>
+      ) : null}
+
+      {exportNote && error === null ? (
+        <p className="mt-2 font-mono text-xs text-muted">{exportNote}</p>
       ) : null}
 
       {byClass !== null && error === null ? (

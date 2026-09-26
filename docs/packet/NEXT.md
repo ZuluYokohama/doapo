@@ -21,8 +21,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (landed) |
 | Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (landed) |
 | Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (landed) |
-| Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **OPEN** (this PR) |
-| Cohort export JSON | Download fail-closed cohort summary artifact from current search | **STOP** |
+| Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **OPEN** (landed) |
+| Cohort export JSON | Download fail-closed cohort summary artifact from current search | **OPEN** (this PR) |
+| Cohort export import | Parse + verify cohort JSON digest into inspector view | **STOP** |
+| Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -129,10 +131,18 @@ STOP rows are named next candidates only — not committed scope.
 - Result: `{ ok, total, byClass: { id, label, count }[], unmatched, skipped }`
 - `/packet` live + wells register: **Cohort summary** table from current search results
 
-## Kill fact authoring UI — OPEN (this PR)
+## Kill fact authoring UI — OPEN (landed)
 
 - `kill-fact-edit.ts`: `setKillTriggered` / `isKillTriggered` / `killFactKey` / `listKillConditionsForUi` (fail-closed)
 - Preferred measured key `kill:<id>` with value `KILL_TRIGGER_VALUE` (`triggered`); clear removes matching bare/`kill:` facts
 - Cap `MAX_MEASURED_FACTS` (packet); aware of `MAX_WELL_FACTS` (from-well builder only)
 - `/packet`: **Kill fact authoring** strip lists pack `killConditions` with Triggered toggle → working packet
-- Feeds kill check / evaluate / cross-pack audit; named next STOP: cohort export JSON
+- Feeds kill check / evaluate / cross-pack audit
+
+## Cohort export JSON — OPEN (this PR)
+
+- `cohort-export.ts`: `exportOutcomeCohort` + `cohortFilename` (fail-closed)
+- Delegates counts to `summarizeOutcomeCohort`; bundle: schemaVersion, packId/packVersion, total, byClass, unmatched, skipped, notes, bundleDigest
+- Download name `outcome-cohort-<packId>.json` (sanitized, truncated)
+- Cohort strips (wells + `/packet` live): **Export JSON** button beside Summarize
+- Demo artifact — not durable authority; humans still own OPEN
