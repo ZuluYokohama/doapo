@@ -13,6 +13,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { searchWells } from "@/lib/ndic.functions";
 import { BatchKillScanStrip, resolveScanPack } from "@/components/batch-kill-scan-strip";
 import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
+import { PrioritizeStrip } from "@/components/prioritize-strip";
 import {
   UI_LEDGER_CAP,
   countSealsForSubject,
@@ -512,6 +513,7 @@ export function DoapoApp({
               packId={scanPackId}
               onPackId={setScanPackId}
             />
+            <PrioritizeStrip wells={register} />
           </div>
 
           {listError ? (

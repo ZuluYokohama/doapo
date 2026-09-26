@@ -27,7 +27,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **OPEN** (landed) |
 | Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **OPEN** (landed) |
 | Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **OPEN** (landed) |
-| Measured DUC/status derivation | Derive residue / kill hints from live WellRow (status, spud age); wire into `/packet` live build | **OPEN** (this PR) |
+| Measured DUC/status derivation | Derive residue / kill hints from live WellRow (status, spud age); wire into `/packet` live build | **OPEN** (landed) |
+| Operator / DUC prioritization | Rank wells or operators from live search by measured status / DUC age / operator / county | **OPEN** (this PR) |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -184,7 +185,7 @@ STOP rows are named next candidates only — not committed scope.
 - Demo artifact — not durable authority; humans still own OPEN
 
 
-## Measured DUC/status derivation — OPEN (this PR)
+## Measured DUC/status derivation — OPEN (landed)
 
 - `derive-from-well.ts`: `deriveFromWell` + `daysSinceSpud` (fail-closed)
 - Rules from real `WellRow` fields only: Confidential → `confidential-lag` residue; NC + `days-since-spud` ≥ `DUC_AGE_DAYS_THRESHOLD` (365) → `duc-age` residue; bakken-duc pack kill `stale-duc` → measured `kill:stale-duc=triggered`
@@ -192,8 +193,23 @@ STOP rows are named next candidates only — not committed scope.
 - `from-well.ts` / `buildPacketFromWell`: always-on residueDefaults + derived residue/facts (conditional ids not blind-copied)
 - `/packet` live build path inherits derivation automatically; kill-fact authoring remains for overrides
 - Fail-closed; **no invented oil/gas/water volumes**; no NexTier / Patterson-UTI / arena marketing in product copy
-- **Direction: info → value** (Technical Sales Rep NEX / Williston intent). **Freeze:** do **not** add another export/import STOP gate
+- **Freeze:** do **not** add another export/import STOP gate — prefer measured analysis tables over freeze-JSON churn
 
 ## Freeze — no more export/import STOP strips
 
-Named next candidates after this gate must not invent another export/import artifact strip. Prefer measured derivation, status→value rules, and pack/substrate honesty over freeze-JSON churn.
+Named next candidates must **not** invent another export/import artifact strip. Prefer measured derivation, prioritization / cohort analysis tables, status→value rules, and pack/substrate honesty over freeze-JSON churn. Existing export/import STOPs stay landed; do not mirror them for new analysis gates.
+
+## Charter — data analysis platform (not sales CRM)
+
+DOAPO is a **data analysis platform**: NDIC measured substrate → fail-closed measured analysis → durable analytic artifacts (packets, seals, ranked tables). It is **not** a sales-engagement CRM. Product copy must not pitch NexTier / Patterson-UTI / arena marketing. No invented oil/gas/water volumes.
+
+## Operator / DUC prioritization — OPEN (this PR)
+
+- `prioritize.ts`: `prioritizeWells` + `prioritizeOperators` + `priorityScore` (fail-closed)
+- Cap `MAX_PRIORITIZE_WELLS` / `MAX_PRIORITIZE_OPERATORS` (64); uses `daysSinceSpud` + `outcomeOf` only
+- Well rows: subject, label, operator, county, status, days-since-spud, stale-duc flag, priority
+- Operator rollup: well/DUC/stale/sealed counts, max days, county sample, priority
+- Ranking: stale DUC (age ≥ `DUC_AGE_DAYS_THRESHOLD`) first, then fresher DUCs, then other statuses — measured fields only
+- `/packet` live + wells register: **Operator / DUC prioritization** strip beside cohort / kill-scan (Rank; Wells | Operators toggle)
+- **No** new export/import freeze strip for this gate
+- Fail-closed; **no invented volumes**; no NexTier / Patterson marketing in product copy

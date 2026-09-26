@@ -44,6 +44,7 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **Kill scan export import:** paste/file load on kill scan strips; verify schemaVersion + digest into inspector view
 - **Cross-pack kill audit export JSON:** download fail-closed cross-pack audit artifact (schemaVersion + digest) from `/packet` strip
 - **Measured DUC/status derivation:** live WellRow → residue / kill hints (`derive-from-well.ts` via `buildPacketFromWell`); no invented volumes; freeze on further export/import STOP gates
+- **Operator / DUC prioritization:** rank wells or operators from live search by measured status / days-since-spud / operator / county (`prioritize.ts`); table on wells + `/packet` live; no export/import strip
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 
