@@ -19,6 +19,12 @@ import {
   openCandidate,
   proposePacket,
 } from "./roles.ts";
+import {
+  KILL_TRIGGER_VALUE,
+  applyKillGate,
+  buildKillHaystack,
+  checkKillConditions,
+} from "./kill-check.ts";
 
 test("bakken pack validates", () => {
   const result = validateDomainPack(BAKKEN_PACK);
@@ -925,4 +931,190 @@ test("evidenceFilename sanitizes and truncates", () => {
   assert.ok(name.startsWith("packet-evidence-"));
   assert.ok(name.endsWith(".json"));
   assert.ok(name.length < 80);
+});
+
+test("checkKillConditions miss when no triggered fact", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  const result = checkKillConditions(BAKKEN_PACK, packet);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.hit, false);
+  }
+});
+
+test("checkKillConditions hit on kill.id=triggered", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.residue = [];
+  packet.measuredFacts = [
+    {
+      key: "invented-volumes",
+      value: KILL_TRIGGER_VALUE,
+      evidence: "measured",
+      sourceLabel: "field observation",
+    },
+  ];
+  const result = checkKillConditions(BAKKEN_PACK, packet);
+  assert.equal(result.ok, true);
+  if (result.ok && result.hit) {
+    assert.equal(result.killId, "invented-volumes");
+    assert.match(result.statement, /STOP/);
+  } else {
+    assert.fail("expected kill hit");
+  }
+  const hay = buildKillHaystack(packet.measuredFacts);
+  assert.match(hay, /invented-volumes=triggered/);
+});
+
+test("checkKillConditions hit on kill:id prefix", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.residue = [];
+  packet.measuredFacts = [
+    {
+      key: "kill:agent-self-open",
+      value: "TRIGGERED",
+      evidence: "measured",
+      sourceLabel: "runtime",
+    },
+  ];
+  const result = checkKillConditions(BAKKEN_PACK, packet);
+  assert.equal(result.ok, true);
+  if (result.ok && result.hit) {
+    assert.equal(result.killId, "agent-self-open");
+  } else {
+    assert.fail("expected kill hit on prefixed key");
+  }
+});
+
+test("checkKillConditions ignores non-triggered values", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.measuredFacts = [
+    {
+      key: "invented-volumes",
+      value: "false",
+      evidence: "measured",
+      sourceLabel: "field",
+    },
+  ];
+  const result = checkKillConditions(BAKKEN_PACK, packet);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.hit, false);
+  }
+});
+
+test("applyKillGate forces STOP and residue on hit", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "OPEN_CANDIDATE";
+  packet.proposedBy = "human_open";
+  packet.residue = [];
+  packet.notes = "";
+  packet.measuredFacts = [
+    {
+      key: "unverified-org-claim",
+      value: "triggered",
+      evidence: "measured",
+      sourceLabel: "field",
+    },
+  ];
+  const gated = applyKillGate(BAKKEN_PACK, packet);
+  assert.equal(gated.gate, "STOP");
+  assert.match(gated.notes, /kill:unverified-org-claim/);
+  assert.ok(gated.residue.length >= 1);
+  assert.equal(packet.gate, "OPEN_CANDIDATE");
+});
+
+test("applyKillGate no-op when no hit", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.notes = "clean";
+  const gated = applyKillGate(BAKKEN_PACK, packet);
+  assert.equal(gated.gate, "STOP");
+  assert.equal(gated.notes, "clean");
+  assert.equal(gated.residue.length, packet.residue.length);
+});
+
+test("evaluatePacket FAIL when kill triggered despite empty residue", () => {
+  const proposed = proposePacket({
+    packId: BAKKEN_PACK.id,
+    packVersion: BAKKEN_PACK.version,
+    subjectId: "eval-kill",
+    subjectLabel: "Eval Kill",
+    measuredFacts: [
+      {
+        key: "invented-volumes",
+        value: "triggered",
+        evidence: "measured",
+        sourceLabel: "field",
+      },
+    ],
+    outcomeClassId: null,
+    designIntent: null,
+    fieldObservation: null,
+    advisorAnswers: [],
+    residue: [],
+    notes: "",
+    gate: "STOP",
+  });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+  const scored = evaluatePacket(proposed.packet);
+  assert.equal(scored.ok, true);
+  if (!scored.ok) return;
+  assert.equal(scored.verdict, "FAIL");
+  assert.equal(scored.packet.gate, "STOP");
+  assert.ok(scored.reasons.some((r) => r.includes("kill:invented-volumes")));
+  assert.match(scored.packet.notes, /kill:invented-volumes/);
+});
+
+test("evaluatePacket PASS when no kill and empty residue", () => {
+  const proposed = proposePacket({
+    packId: BAKKEN_PACK.id,
+    packVersion: BAKKEN_PACK.version,
+    subjectId: "eval-pass",
+    subjectLabel: "Eval Pass",
+    measuredFacts: [
+      {
+        key: "status",
+        value: "A",
+        evidence: "measured",
+        sourceLabel: "NDIC GIS",
+      },
+    ],
+    outcomeClassId: "producing",
+    designIntent: null,
+    fieldObservation: "Active",
+    advisorAnswers: [],
+    residue: [],
+    notes: "",
+    gate: "STOP",
+  });
+  assert.equal(proposed.ok, true);
+  if (!proposed.ok) return;
+  const scored = evaluatePacket(proposed.packet);
+  assert.equal(scored.ok, true);
+  if (!scored.ok) return;
+  assert.equal(scored.verdict, "PASS");
+  assert.notEqual(scored.packet.gate, "OPEN_CANDIDATE");
+});
+
+test("checkKillConditions fail-closed on empty kill list", () => {
+  const pack = {
+    ...BAKKEN_PACK,
+    killConditions: [],
+  };
+  const packet = exampleHumanOpenCandidate();
+  const result = checkKillConditions(pack, packet);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /empty/);
+  }
 });

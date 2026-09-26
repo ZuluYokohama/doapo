@@ -92,6 +92,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
+| `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 
@@ -103,6 +104,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Evidence export
 
 `evidence-export.ts` builds a downloadable freeze artifact: validated packet, subject-scoped seals, ledger tip, full-ledger `chainOk`, and `bundleDigest`. `/packet` offers **Export evidence** when a validated packet is in view. Demo artifact from the session ledger — **not durable authority**; humans still own OPEN. See [NEXT.md](NEXT.md) and [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
+
+## Kill-condition runtime
+
+`kill-check.ts` evaluates pack `killConditions` against packet measured facts. A kill hits when a fact key equals `kill.id` or `kill:<id>` with value `triggered`. `evaluatePacket` applies `applyKillGate` last so a triggered kill forces STOP / FAIL. See [NEXT.md](NEXT.md).
 
 ## How to run tests
 

@@ -37,6 +37,14 @@ export {
 } from "./validate.ts";
 
 export {
+  KILL_TRIGGER_VALUE,
+  checkKillConditions,
+  applyKillGate,
+  buildKillHaystack,
+  type KillCheckResult,
+} from "./kill-check.ts";
+
+export {
   MAX_EVAL_REASONS,
   proposePacket,
   evaluatePacket,

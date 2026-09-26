@@ -10,8 +10,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Evaluator split from proposer | Separate evaluator path from `agent_propose` in runtime | **OPEN** (landed) |
 | Live well binding | Wire a live NDIC `WellRow` into `/packet` via `from-well.ts` (fixtures | live mode; no invented volumes) | **OPEN** (landed) |
 | Well packet history | Subject-scoped seal list + session ledger store for `/packet` and wells detail | **OPEN** (landed) |
-| Auditable packet export | Downloadable evidence bundle: packet + subject seals + tip + chain verify | **OPEN** (this PR) |
-| Kill-condition runtime check | Evaluate pack killConditions against packet measured facts / answers → forced STOP | STOP |
+| Auditable packet export | Downloadable evidence bundle: packet + subject seals + tip + chain verify | **OPEN** (landed) |
+| Kill-condition runtime check | Evaluate pack killConditions against packet measured facts / answers → forced STOP | **OPEN** (this PR) |
 | Advisor answer UI | Human/evaluator fill advisorChecks on `/packet` before open | STOP |
 | Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | STOP |
 
@@ -33,9 +33,18 @@ STOP rows are named next candidates only — not committed scope.
 - Wells detail: seal count + recent history via shared `wellSubjectId(well)` (same id as `buildPacketFromWell`)
 - Not durable authority — demo only
 
-## Auditable packet export — OPEN (this PR)
+## Auditable packet export — OPEN (landed)
 
 - `evidence-export.ts`: `exportPacketEvidence` builds a fail-closed JSON freeze artifact
 - Bundle: validated packet + subject-scoped seals (cap `EXPORT_SEAL_CAP`) + tip + `chainOk` (full ledger) + `bundleDigest`
 - `/packet`: **Export evidence** downloads `packet-evidence-<subjectId>.json` when a validated packet is in view
 - Demo artifact from session ledger — not durable authority; humans still own OPEN
+
+## Kill-condition runtime check — OPEN (this PR)
+
+- `kill-check.ts`: `checkKillConditions` + `applyKillGate` (fail-closed)
+- Match rule: measured fact key equals `kill.id` or `kill:<id>` with value `triggered` (case-insensitive)
+- `evaluatePacket` applies kill gate last — triggered kill forces gate STOP and verdict FAIL (cannot PASS past a kill)
+- `/packet`: **Kill check** strip shows hit / miss / fail-closed when packet validates
+- Authors set the measured fact when a kill is observed; no fuzzy statement matching
+

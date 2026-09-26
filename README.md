@@ -27,6 +27,7 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **ADR-001 (schema as platform core):** [docs/packet/ADR-001-packet-schema.md](docs/packet/ADR-001-packet-schema.md)
 - **Named next gates:** [docs/packet/NEXT.md](docs/packet/NEXT.md)
 - **UI packet inspector:** read-only `/packet` route (fixtures; no NDIC loader)
+- **Kill-condition runtime:** measured fact `kill.id` / `kill:<id>=triggered` forces STOP via `evaluatePacket`
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 
