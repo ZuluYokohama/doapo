@@ -53,6 +53,16 @@ export {
 } from "./advisor-answer.ts";
 
 export {
+  setResidueItem,
+  addResidueItem,
+  removeResidueItem,
+  listResidueForUi,
+  findResidueItem,
+  residueEvidenceOptions,
+  type ResidueEditResult,
+} from "./residue-edit.ts";
+
+export {
   MAX_EVAL_REASONS,
   proposePacket,
   evaluatePacket,

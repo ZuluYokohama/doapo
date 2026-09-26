@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { PacketInspector } from "@/components/packet-inspector";
 import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
+import { ResidueEditorStrip } from "@/components/residue-editor-strip";
 import {
   exampleAgentSelfOpenStop,
   exampleHumanOpenCandidate,
@@ -1785,6 +1786,12 @@ function PacketPage() {
         validation !== null ? (
           <AdvisorAnswersStrip
             pack={answerPackLookup.pack}
+            packet={packet}
+            onPacket={applyWorkingPacket}
+          />
+        ) : null}
+        {packet && validation !== null ? (
+          <ResidueEditorStrip
             packet={packet}
             onPacket={applyWorkingPacket}
           />

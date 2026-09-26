@@ -11,7 +11,7 @@ import {
 import { BAKKEN_PACK } from "./packs/bakken.ts";
 import { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
 import { getPack, listPackIds, lookupPack, MAX_REGISTERED_PACKS } from "./packs/registry.ts";
-import { MAX_ADVISOR_ANSWERS, PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
+import { MAX_ADVISOR_ANSWERS, MAX_RESIDUE_ITEMS, PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
 import { validateDomainPack, validateIssuePacket } from "./validate.ts";
 import {
   MAX_EVAL_REASONS,
@@ -31,6 +31,14 @@ import {
   listAdvisorChecksForUi,
   setAdvisorAnswer,
 } from "./advisor-answer.ts";
+import {
+  addResidueItem,
+  findResidueItem,
+  listResidueForUi,
+  removeResidueItem,
+  residueEvidenceOptions,
+  setResidueItem,
+} from "./residue-edit.ts";
 
 test("bakken pack validates", () => {
   const result = validateDomainPack(BAKKEN_PACK);
@@ -1325,6 +1333,171 @@ test("evaluatePacket still works after setAdvisorAnswer", () => {
   assert.equal(scored.verdict, "PASS");
   assert.notEqual(scored.packet.gate, "OPEN_CANDIDATE");
   assert.equal(scored.packet.advisorAnswers.length, 1);
+});
+
+
+test("setResidueItem fail-closed on empty statement", () => {
+  const packet = exampleHumanOpenCandidate();
+  assert.ok(packet.residue.length >= 1);
+  const id = packet.residue[0].id;
+  const result = setResidueItem(packet, {
+    id,
+    statement: "",
+    evidence: "unknown",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /empty/);
+  }
+  assert.equal(packet.residue[0].statement.length > 0, true);
+});
+
+test("setResidueItem replaces statement and evidence", () => {
+  const packet = exampleHumanOpenCandidate();
+  const before = packet.residue.length;
+  assert.ok(before >= 1);
+  const id = packet.residue[0].id;
+  const result = setResidueItem(packet, {
+    id,
+    statement: "Updated residue statement for UI edit",
+    evidence: "derived",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.packet.residue.length, before);
+  assert.equal(result.packet.residue[0].statement, "Updated residue statement for UI edit");
+  assert.equal(result.packet.residue[0].evidence, "derived");
+  assert.notEqual(packet.residue[0].statement, result.packet.residue[0].statement);
+});
+
+test("setResidueItem rejects unknown id and bad evidence", () => {
+  const packet = exampleHumanOpenCandidate();
+  const missing = setResidueItem(packet, {
+    id: "not-a-real-residue-id",
+    statement: "something",
+    evidence: "measured",
+  });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.match(missing.reason, /not found/);
+  }
+  const badEv = setResidueItem(packet, {
+    id: packet.residue[0].id,
+    statement: "ok text",
+    evidence: "not-an-evidence" as unknown as "measured",
+  });
+  assert.equal(badEv.ok, false);
+  if (!badEv.ok) {
+    assert.match(badEv.reason, /evidence/);
+  }
+});
+
+test("addResidueItem appends and rejects duplicate / full", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.residue = packet.residue.slice();
+  const added = addResidueItem(packet, {
+    id: "ui-added-residue",
+    statement: "Explicit residue from editor",
+    evidence: "unknown",
+  });
+  assert.equal(added.ok, true);
+  if (!added.ok) return;
+  assert.equal(added.packet.residue.length, packet.residue.length + 1);
+  const dup = addResidueItem(added.packet, {
+    id: "ui-added-residue",
+    statement: "dup",
+    evidence: "unknown",
+  });
+  assert.equal(dup.ok, false);
+  if (!dup.ok) {
+    assert.match(dup.reason, /duplicate/);
+  }
+  const full: typeof packet = {
+    ...added.packet,
+    residue: [],
+  };
+  let i = 0;
+  while (i < MAX_RESIDUE_ITEMS) {
+    full.residue.push({
+      id: "pad-" + String(i),
+      statement: "pad",
+      evidence: "unknown",
+    });
+    i += 1;
+  }
+  const over = addResidueItem(full, {
+    id: "one-more",
+    statement: "overflow",
+    evidence: "unknown",
+  });
+  assert.equal(over.ok, false);
+  if (!over.ok) {
+    assert.match(over.reason, /full/);
+  }
+});
+
+test("removeResidueItem drops by id and fail-closes missing", () => {
+  const packet = exampleHumanOpenCandidate();
+  assert.ok(packet.residue.length >= 1);
+  const id = packet.residue[0].id;
+  const before = packet.residue.length;
+  const removed = removeResidueItem(packet, id);
+  assert.equal(removed.ok, true);
+  if (!removed.ok) return;
+  assert.equal(removed.packet.residue.length, before - 1);
+  assert.equal(findResidueItem(removed.packet.residue, id), null);
+  assert.equal(packet.residue.length, before);
+  const miss = removeResidueItem(packet, "no-such-id");
+  assert.equal(miss.ok, false);
+  if (!miss.ok) {
+    assert.match(miss.reason, /not found/);
+  }
+  const emptyId = removeResidueItem(packet, "");
+  assert.equal(emptyId.ok, false);
+});
+
+test("listResidueForUi and residueEvidenceOptions bounded", () => {
+  const packet = exampleHumanOpenCandidate();
+  const listed = listResidueForUi(packet.residue);
+  assert.ok(listed.length >= 1);
+  assert.ok(listed.length <= MAX_RESIDUE_ITEMS);
+  const opts = residueEvidenceOptions();
+  assert.equal(opts.length, 5);
+  assert.ok(opts.includes("measured"));
+  assert.ok(opts.includes("unknown"));
+});
+
+test("evaluatePacket and validate after residue edit", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  const cleared = removeResidueItem(packet, packet.residue[0].id);
+  assert.equal(cleared.ok, true);
+  if (!cleared.ok) return;
+  let working = cleared.packet;
+  let i = 0;
+  while (i < working.residue.length) {
+    const drop = removeResidueItem(working, working.residue[0].id);
+    assert.equal(drop.ok, true);
+    if (!drop.ok) return;
+    working = drop.packet;
+    i += 1;
+  }
+  assert.equal(working.residue.length, 0);
+  const added = addResidueItem(working, {
+    id: "editor-residue",
+    statement: "Residue stated via editor before open",
+    evidence: "derived",
+  });
+  assert.equal(added.ok, true);
+  if (!added.ok) return;
+  const v = validateIssuePacket(added.packet);
+  assert.equal(v.ok, true);
+  const scored = evaluatePacket(added.packet);
+  assert.equal(scored.ok, true);
+  if (!scored.ok) return;
+  assert.equal(scored.verdict, "RESIDUE");
+  assert.equal(scored.packet.residue.length, 1);
 });
 
 

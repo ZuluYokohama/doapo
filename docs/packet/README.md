@@ -95,6 +95,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
+| `residue-edit.ts` | `setResidueItem` / `addResidueItem` / `removeResidueItem` (edit before open) |
 | `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
 | `ledger-durable.ts` | Opt-in localStorage durable ledger (prefer when present) |
 | `packet.test.ts` | Node test suite |
@@ -116,6 +117,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Advisor answer UI
 
 `advisor-answer.ts` lets human/evaluator fill pack `advisorChecks` on a working packet before open. `/packet` lists checks (bounded), constrains roles, fail-closes empty answers, and feeds validate / evaluate / open / export. See [NEXT.md](NEXT.md).
+
+## Residue editor UI
+
+`residue-edit.ts` lets humans edit packet `residue` before open: set / add / remove with `MAX_RESIDUE_ITEMS`, text bounds, and evidence enum checks. `/packet` lists items (bounded), fail-closes empty statement / over-cap / bad evidence, and feeds validate / evaluate / open / export. See [NEXT.md](NEXT.md).
 
 ## Pack import JSON
 
