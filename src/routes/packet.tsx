@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { PacketInspector } from "@/components/packet-inspector";
 import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
@@ -28,16 +28,18 @@ import {
   clearDurableLedger,
   loadPreferredLedger,
   loadSessionLedger,
-  lookupPack,
+  importPackFromJson,
   openCandidate,
   persistSessionToDurable,
   proposePacket,
+  resolvePack,
   saveDurableLedger,
   saveSessionLedger,
   sealFromPacket,
   tipDigest,
   validateIssuePacket,
   wellSubjectId,
+  type DomainPack,
   type IssuePacket,
   type SealLedger,
   type SealRecord,
@@ -457,15 +459,17 @@ function KillCheckStrip({
   packId,
   packet,
   validationOk,
+  overlayPack,
 }: {
   packId: string | null;
   packet: IssuePacket | null;
   validationOk: boolean;
+  overlayPack: DomainPack | null;
 }) {
   if (!packet || !validationOk || packId === null || packId.length === 0) {
     return null;
   }
-  const looked = lookupPack(packId);
+  const looked = resolvePack(packId, overlayPack);
   if (!looked.ok) {
     return (
       <section className="mb-4 rounded-md border border-line bg-surface p-4">
@@ -557,6 +561,7 @@ function EvidenceExportStrip({
 
 function LiveWellPanel({
   packId,
+  packIds,
   onPackId,
   selected,
   onSelected,
@@ -570,6 +575,7 @@ function LiveWellPanel({
   buildError,
 }: {
   packId: string;
+  packIds: string[];
   onPackId: (id: string) => void;
   selected: WellRow | null;
   onSelected: (well: WellRow) => void;
@@ -582,7 +588,6 @@ function LiveWellPanel({
   onSearch: (event: FormEvent) => void;
   buildError: string | null;
 }) {
-  const packIds = listPackIds();
   return (
     <section className="mb-4 rounded-md border border-line bg-surface p-4">
       <h2 className="text-xs tracking-widest text-accent uppercase">
@@ -693,6 +698,121 @@ function LiveWellPanel({
           </ul>
         </>
       ) : null}
+    </section>
+  );
+}
+
+
+function PackImportStrip({
+  imported,
+  importError,
+  pasteDraft,
+  onPasteDraft,
+  onImportText,
+  onClear,
+}: {
+  imported: DomainPack | null;
+  importError: string | null;
+  pasteDraft: string;
+  onPasteDraft: (value: string) => void;
+  onImportText: (text: string) => void;
+  onClear: () => void;
+}) {
+  function onFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const files = input.files;
+    if (!files || files.length < 1) return;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      onImportText(value);
+      input.value = "";
+    };
+    reader.onerror = () => {
+      onImportText("");
+      input.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function onPasteSubmit(event: FormEvent) {
+    event.preventDefault();
+    onImportText(pasteDraft);
+  }
+
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Pack import
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Paste or load a DomainPack JSON file. Fail-closed parse + validate;
+        size-capped. Imported pack stays in session only — static registry is
+        not mutated. Select it for live well build / kill / advisor.
+      </p>
+      <form onSubmit={onPasteSubmit} className="mt-3 space-y-2">
+        <label className="block text-xs tracking-wide text-muted uppercase">
+          Paste JSON
+          <textarea
+            value={pasteDraft}
+            onChange={(event) => onPasteDraft(event.target.value)}
+            rows={4}
+            spellCheck={false}
+            className="mt-1 w-full rounded-md border border-line bg-bg px-3 py-2 font-mono text-xs text-fg"
+            placeholder='{"schemaVersion":"1.0.0","id":"…",…}'
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+          >
+            Import paste
+          </button>
+          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg">
+            Load file
+            <input
+              type="file"
+              accept="application/json,.json,text/plain"
+              onChange={onFileChange}
+              className="sr-only"
+            />
+          </label>
+          {imported ? (
+            <button
+              type="button"
+              onClick={() => onClear()}
+              className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+            >
+              Clear import
+            </button>
+          ) : null}
+        </div>
+      </form>
+      {importError ? (
+        <p className="mt-3 text-sm text-accent" role="alert">
+          fail-closed — {importError}
+        </p>
+      ) : null}
+      {imported ? (
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-muted uppercase">Imported id</dt>
+            <dd className="font-mono text-fg">{imported.id}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted uppercase">Version</dt>
+            <dd className="font-mono text-fg">{imported.version}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-muted uppercase">Title</dt>
+            <dd className="text-fg">{imported.title}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No imported pack in session.</p>
+      )}
     </section>
   );
 }
@@ -810,6 +930,9 @@ function PacketPage() {
     key: string;
     packet: IssuePacket;
   } | null>(null);
+  const [importedPack, setImportedPack] = useState<DomainPack | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importPaste, setImportPaste] = useState("");
 
   useEffect(() => {
     const session = loadSessionLedger();
@@ -935,12 +1058,68 @@ function PacketPage() {
     });
   }
 
-  const packLookup = lookupPack(packId);
+  const selectablePackIds = useMemo(() => {
+    const ids = listPackIds().slice();
+    if (importedPack !== null) {
+      let found = false;
+      let i = 0;
+      while (i < ids.length) {
+        if (ids[i] === importedPack.id) {
+          found = true;
+          break;
+        }
+        i += 1;
+      }
+      if (!found) ids.push(importedPack.id);
+    }
+    return ids;
+  }, [importedPack]);
+
+  const packLookup = resolvePack(packId, importedPack);
+
+  function applyImportedText(raw: string) {
+    if (raw.length === 0) {
+      setImportError("text empty");
+      return;
+    }
+    const result = importPackFromJson(raw);
+    if (!result.ok) {
+      setImportError(result.reason);
+      return;
+    }
+    setImportedPack(result.pack);
+    setImportError(null);
+    setImportPaste("");
+    setPackId(result.pack.id);
+    setRunLiveRuntime(false);
+    setLiveRuntimeSteps(null);
+    setLiveRuntimePacket(null);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        mode: pageMode === "live" ? "live" : prev.mode,
+        pack: result.pack.id,
+      }),
+    });
+  }
+
+  function clearImportedPack() {
+    setImportedPack(null);
+    setImportError(null);
+    const fallback = listPackIds()[0] ?? BAKKEN_PACK.id;
+    setPackId(fallback);
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        pack: pageMode === "live" ? fallback : undefined,
+      }),
+    });
+  }
 
   const liveBuilt = useMemo(() => {
     if (pageMode !== "live") return null;
     if (!selected) return null;
-    const looked = lookupPack(packId);
+    const looked = resolvePack(packId, importedPack);
     if (!looked.ok) {
       return { ok: false as const, reason: looked.reason };
     }
@@ -950,7 +1129,7 @@ function PacketPage() {
       proposedBy: "agent_propose",
       gate: "STOP",
     });
-  }, [pageMode, selected, packId]);
+  }, [pageMode, selected, packId, importedPack]);
 
   const livePacket =
     liveBuilt && liveBuilt.ok ? liveBuilt.packet : null;
@@ -1106,8 +1285,12 @@ function PacketPage() {
     [packet],
   );
 
-  const inspectorPackLookup = packet ? lookupPack(packet.packId) : packLookup;
-  const answerPackLookup = packet ? lookupPack(packet.packId) : packLookup;
+  const inspectorPackLookup = packet
+    ? resolvePack(packet.packId, importedPack)
+    : packLookup;
+  const answerPackLookup = packet
+    ? resolvePack(packet.packId, importedPack)
+    : packLookup;
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6">
@@ -1137,9 +1320,21 @@ function PacketPage() {
           Registered packs
         </h2>
         <p className="mt-2 font-mono text-sm text-fg">
-          {listPackIds().join(" · ")}
+          {selectablePackIds.join(" · ")}
+          {importedPack ? " (session import)" : ""}
         </p>
       </section>
+
+      <div className="mt-4">
+        <PackImportStrip
+          imported={importedPack}
+          importError={importError}
+          pasteDraft={importPaste}
+          onPasteDraft={setImportPaste}
+          onImportText={applyImportedText}
+          onClear={clearImportedPack}
+        />
+      </div>
 
       <div
         role="tablist"
@@ -1204,6 +1399,7 @@ function PacketPage() {
         <div className="mt-4">
           <LiveWellPanel
             packId={packId}
+            packIds={selectablePackIds}
             onPackId={changePack}
             selected={selected}
             onSelected={selectWell}
@@ -1275,6 +1471,7 @@ function PacketPage() {
           packId={packet ? packet.packId : null}
           packet={packet}
           validationOk={validation !== null && validation.ok}
+          overlayPack={importedPack}
         />
         <EvidenceExportStrip
           packet={packet}

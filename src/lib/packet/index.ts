@@ -125,6 +125,15 @@ export {
 } from "./packs/registry.ts";
 
 export {
+  MAX_PACK_JSON_CHARS,
+  importPackFromJson,
+  resolvePack,
+  type ImportPackResult,
+  type ImportPackOk,
+  type ImportPackErr,
+} from "./pack-import.ts";
+
+export {
   MAX_WELL_FACTS,
   wellToMeasuredFacts,
   wellSubjectId,

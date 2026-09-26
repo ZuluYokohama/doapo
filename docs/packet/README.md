@@ -94,6 +94,8 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
+| `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
+| `ledger-durable.ts` | Opt-in localStorage durable ledger (prefer when present) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 
@@ -113,6 +115,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Advisor answer UI
 
 `advisor-answer.ts` lets human/evaluator fill pack `advisorChecks` on a working packet before open. `/packet` lists checks (bounded), constrains roles, fail-closes empty answers, and feeds validate / evaluate / open / export. See [NEXT.md](NEXT.md).
+
+## Pack import JSON
+
+`pack-import.ts` parses and fail-closed validates a `DomainPack` from bounded JSON (`MAX_PACK_JSON_CHARS`). The static registry is not mutated; `/packet` keeps an imported pack in session state and resolves it via `resolvePack` for live build / kill / advisor. See [NEXT.md](NEXT.md).
 
 ## How to run tests
 

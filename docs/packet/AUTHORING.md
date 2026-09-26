@@ -70,3 +70,7 @@ Unknown pack ids must fail closed: `getPack` returns `null` plus a reason string
 
 - [BAKKEN.md](BAKKEN.md) — full Bakken / Williston lifecycle lens on NDIC GIS
 - [DUC-QUEUE.md](DUC-QUEUE.md) — same NDIC substrate; DUC / NC completion-readiness lens (`bakken-duc`)
+
+## Import from JSON (session only)
+
+Use `importPackFromJson(text)` to parse + validate a pack for `/packet` session overlay. This does **not** register into `packs/registry.ts`. To ship a pack permanently, follow the checklist above and add it to the static registry.
