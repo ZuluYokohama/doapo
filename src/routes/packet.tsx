@@ -4,6 +4,7 @@ import { PacketInspector } from "@/components/packet-inspector";
 import { AdvisorAnswersStrip } from "@/components/advisor-answers-strip";
 import { ResidueEditorStrip } from "@/components/residue-editor-strip";
 import { BatchKillScanStrip } from "@/components/batch-kill-scan-strip";
+import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
 import { CrossPackKillAuditStrip } from "@/components/cross-pack-kill-audit-strip";
 import {
   exampleAgentSelfOpenStop,
@@ -1754,6 +1755,10 @@ function PacketPage() {
             </div>
           ) : null}
           <BatchKillScanStrip
+            wells={results}
+            pack={packLookup.ok ? packLookup.pack : null}
+          />
+          <OutcomeCohortStrip
             wells={results}
             pack={packLookup.ok ? packLookup.pack : null}
           />
