@@ -11,7 +11,7 @@ import {
 import { BAKKEN_PACK } from "./packs/bakken.ts";
 import { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
 import { getPack, listPackIds, lookupPack, MAX_REGISTERED_PACKS } from "./packs/registry.ts";
-import { PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
+import { MAX_ADVISOR_ANSWERS, PACKET_SCHEMA_VERSION, type IssuePacket } from "./types.ts";
 import { validateDomainPack, validateIssuePacket } from "./validate.ts";
 import {
   MAX_EVAL_REASONS,
@@ -25,6 +25,12 @@ import {
   buildKillHaystack,
   checkKillConditions,
 } from "./kill-check.ts";
+import {
+  allowedAnswerRoles,
+  findAdvisorAnswer,
+  listAdvisorChecksForUi,
+  setAdvisorAnswer,
+} from "./advisor-answer.ts";
 
 test("bakken pack validates", () => {
   const result = validateDomainPack(BAKKEN_PACK);
@@ -1117,4 +1123,206 @@ test("checkKillConditions fail-closed on empty kill list", () => {
   if (!result.ok) {
     assert.match(result.reason, /empty/);
   }
+});
+
+test("allowedAnswerRoles always includes evaluator and human_open", () => {
+  const field = BAKKEN_PACK.advisorChecks.find((c) => c.id === "field-evidence");
+  assert.ok(field);
+  if (!field) return;
+  const roles = allowedAnswerRoles(field);
+  assert.ok(roles.includes("evaluator"));
+  assert.ok(roles.includes("human_open"));
+  assert.ok(roles.includes("agent_propose"));
+  const openCheck = BAKKEN_PACK.advisorChecks.find(
+    (c) => c.id === "authority-boundary",
+  );
+  assert.ok(openCheck);
+  if (!openCheck) return;
+  const openRoles = allowedAnswerRoles(openCheck);
+  assert.ok(openRoles.includes("evaluator"));
+  assert.ok(openRoles.includes("human_open"));
+  assert.equal(openRoles.includes("agent_propose"), false);
+});
+
+test("setAdvisorAnswer fail-closed on empty answer", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  const check = BAKKEN_PACK.advisorChecks[0];
+  const result = setAdvisorAnswer(
+    packet,
+    {
+      checkId: check.id,
+      answer: "",
+      evidence: "unknown",
+      answeredAs: "evaluator",
+    },
+    check,
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /empty/);
+  }
+  assert.equal(packet.advisorAnswers.length, 0);
+});
+
+test("setAdvisorAnswer inserts and replaces same checkId", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.advisorAnswers = [];
+  const check = BAKKEN_PACK.advisorChecks.find((c) => c.id === "field-evidence");
+  assert.ok(check);
+  if (!check) return;
+  const first = setAdvisorAnswer(
+    packet,
+    {
+      checkId: check.id,
+      answer: "API and status present; volumes absent",
+      evidence: "derived",
+      answeredAs: "agent_propose",
+    },
+    check,
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.packet.advisorAnswers.length, 1);
+  assert.equal(first.packet.advisorAnswers[0].answeredAs, "agent_propose");
+  const second = setAdvisorAnswer(
+    first.packet,
+    {
+      checkId: check.id,
+      answer: "replaced answer text",
+      evidence: "unknown",
+      answeredAs: "evaluator",
+    },
+    check,
+  );
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.packet.advisorAnswers.length, 1);
+  assert.equal(second.packet.advisorAnswers[0].answer, "replaced answer text");
+  assert.equal(second.packet.advisorAnswers[0].answeredAs, "evaluator");
+  assert.equal(packet.advisorAnswers.length, 0);
+});
+
+test("setAdvisorAnswer rejects agent_propose on human_open check", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  const check = BAKKEN_PACK.advisorChecks.find(
+    (c) => c.id === "authority-boundary",
+  );
+  assert.ok(check);
+  if (!check) return;
+  const result = setAdvisorAnswer(
+    packet,
+    {
+      checkId: check.id,
+      answer: "agent tries to answer OPEN check",
+      evidence: "unknown",
+      answeredAs: "agent_propose",
+    },
+    check,
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /not allowed/);
+  }
+});
+
+test("setAdvisorAnswer rejects ops_execute", () => {
+  const packet = exampleHumanOpenCandidate();
+  const check = BAKKEN_PACK.advisorChecks[0];
+  const result = setAdvisorAnswer(packet, {
+    checkId: check.id,
+    answer: "ops should not answer",
+    evidence: "unknown",
+    answeredAs: "ops_execute",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /ops_execute/);
+  }
+});
+
+test("setAdvisorAnswer caps at MAX_ADVISOR_ANSWERS", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.advisorAnswers = [];
+  let i = 0;
+  while (i < MAX_ADVISOR_ANSWERS) {
+    packet.advisorAnswers.push({
+      checkId: "pad-" + String(i),
+      answer: "pad",
+      evidence: "unknown",
+      answeredAs: "evaluator",
+    });
+    i += 1;
+  }
+  const check = BAKKEN_PACK.advisorChecks[0];
+  const result = setAdvisorAnswer(
+    packet,
+    {
+      checkId: check.id,
+      answer: "one more",
+      evidence: "unknown",
+      answeredAs: "evaluator",
+    },
+    check,
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /full/);
+  }
+});
+
+test("listAdvisorChecksForUi and findAdvisorAnswer bounded", () => {
+  const listed = listAdvisorChecksForUi(BAKKEN_PACK.advisorChecks);
+  assert.ok(listed.length >= 1);
+  assert.ok(listed.length <= BAKKEN_PACK.advisorChecks.length);
+  const packet = exampleHumanOpenCandidate();
+  packet.advisorAnswers = [
+    {
+      checkId: listed[0].id,
+      answer: "yes",
+      evidence: "derived",
+      answeredAs: "evaluator",
+    },
+  ];
+  const found = findAdvisorAnswer(packet.advisorAnswers, listed[0].id);
+  assert.ok(found);
+  if (found) {
+    assert.equal(found.answer, "yes");
+  }
+  assert.equal(findAdvisorAnswer(packet.advisorAnswers, ""), null);
+});
+
+test("evaluatePacket still works after setAdvisorAnswer", () => {
+  const packet = exampleHumanOpenCandidate();
+  packet.gate = "STOP";
+  packet.proposedBy = "agent_propose";
+  packet.residue = [];
+  const check = BAKKEN_PACK.advisorChecks.find((c) => c.id === "field-evidence");
+  assert.ok(check);
+  if (!check) return;
+  const set = setAdvisorAnswer(
+    packet,
+    {
+      checkId: check.id,
+      answer: "measured fields present; volumes absent",
+      evidence: "derived",
+      answeredAs: "evaluator",
+    },
+    check,
+  );
+  assert.equal(set.ok, true);
+  if (!set.ok) return;
+  const scored = evaluatePacket(set.packet);
+  assert.equal(scored.ok, true);
+  if (!scored.ok) return;
+  assert.equal(scored.verdict, "PASS");
+  assert.notEqual(scored.packet.gate, "OPEN_CANDIDATE");
+  assert.equal(scored.packet.advisorAnswers.length, 1);
 });
