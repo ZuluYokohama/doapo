@@ -161,7 +161,9 @@ import { createHash } from "node:crypto";
 import {
   DEFAULT_KILL_SCAN_EXPORT_NOTES,
   KILL_SCAN_SCHEMA_VERSION,
+  MAX_KILL_SCAN_JSON_CHARS,
   exportKillScan,
+  importKillScan,
   killScanFilename,
 } from "./kill-scan-export.ts";
 
@@ -317,6 +319,162 @@ test("exportKillScan clones rows (mutation safe)", () => {
     wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
     pack: BAKKEN_PACK,
   });
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.bundle.rows[0].wellLabel, before);
+});
+
+test("importKillScan round-trip export → import", () => {
+  const wells = [
+    sampleWell({ api: "33053000010000", fileNo: 1 }),
+    sampleWell({ api: "33053000020000", fileNo: 2 }),
+  ];
+  const exported = exportKillScan({ wells, pack: BAKKEN_PACK });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  assert.ok(exported.json.length < MAX_KILL_SCAN_JSON_CHARS);
+  const imported = importKillScan(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.bundle.schemaVersion, KILL_SCAN_SCHEMA_VERSION);
+  assert.equal(imported.bundle.packId, BAKKEN_PACK.id);
+  assert.equal(imported.bundle.packVersion, BAKKEN_PACK.version);
+  assert.equal(imported.bundle.scanned, 2);
+  assert.equal(imported.bundle.hitCount, 0);
+  assert.equal(imported.bundle.bundleDigest, exported.bundle.bundleDigest);
+  assert.equal(imported.bundle.rows.length, exported.bundle.rows.length);
+  assert.equal(imported.bundle.rows[0].subjectId, exported.bundle.rows[0].subjectId);
+});
+
+test("importKillScan round-trip with hit rows", () => {
+  const pack = packWithStatusKill();
+  const exported = exportKillScan({
+    wells: [
+      sampleWell({ status: "triggered", wellName: "KILL WELL", fileNo: 7 }),
+      sampleWell({ api: "33053000010000", fileNo: 1, status: "A" }),
+    ],
+    pack,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const imported = importKillScan(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.bundle.hitCount, 1);
+  assert.equal(imported.bundle.rows[0].hit, true);
+  assert.equal(imported.bundle.rows[0].killId, "status");
+  assert.equal(imported.bundle.rows[1].hit, false);
+  assert.equal(imported.bundle.bundleDigest, exported.bundle.bundleDigest);
+});
+
+test("importKillScan fail-closed on empty / oversize / bad JSON", () => {
+  const empty = importKillScan("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.match(empty.reason, /empty/);
+  const bad = importKillScan("{not-json");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.reason, /parse/i);
+  const over = importKillScan("x".repeat(MAX_KILL_SCAN_JSON_CHARS + 1));
+  assert.equal(over.ok, false);
+  if (!over.ok) assert.match(over.reason, /size cap/);
+  const notObj = importKillScan("[]");
+  assert.equal(notObj.ok, false);
+  if (!notObj.ok) assert.match(notObj.reason, /object/);
+});
+
+test("importKillScan fail-closed on schemaVersion mismatch", () => {
+  const exported = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = { ...exported.bundle, schemaVersion: "wrong/1" };
+  const result = importKillScan(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /schemaVersion/);
+});
+
+test("importKillScan fail-closed on bundleDigest mismatch", () => {
+  const exported = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = {
+    ...exported.bundle,
+    scanned: exported.bundle.scanned + 1,
+  };
+  const result = importKillScan(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /bundleDigest/);
+});
+
+test("importKillScan fail-closed on tampered digest hex", () => {
+  const exported = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const badHex = "0".repeat(64);
+  assert.notEqual(badHex, exported.bundle.bundleDigest);
+  const broken = { ...exported.bundle, bundleDigest: badHex };
+  const result = importKillScan(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /bundleDigest/);
+});
+
+test("importKillScan fail-closed on missing packId", () => {
+  const exported = exportKillScan({
+    wells: [],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = { ...exported.bundle, packId: "" };
+  const result = importKillScan(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /packId/);
+});
+
+test("importKillScan fail-closed on rows over cap", () => {
+  const exported = exportKillScan({
+    wells: [],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const rows = [];
+  let i = 0;
+  while (i < MAX_KILL_SCAN_WELLS + 1) {
+    rows.push({
+      subjectId: "s" + String(i),
+      wellLabel: "W" + String(i),
+      hit: false,
+    });
+    i += 1;
+  }
+  const broken = { ...exported.bundle, rows };
+  const result = importKillScan(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /rows|MAX_KILL_SCAN/);
+});
+
+test("importKillScan clones rows (mutation safe)", () => {
+  const exported = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const imported = importKillScan(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  const before = imported.bundle.rows[0].wellLabel;
+  imported.bundle.rows[0].wellLabel = before + "-mutated";
+  const again = importKillScan(exported.json);
   assert.equal(again.ok, true);
   if (!again.ok) return;
   assert.equal(again.bundle.rows[0].wellLabel, before);

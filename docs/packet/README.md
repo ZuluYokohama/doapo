@@ -95,14 +95,14 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `kill-scan.ts` | Batch `scanWellsForKills` (≤`MAX_KILL_SCAN_WELLS`) via well→packet→kill |
-| `kill-scan-export.ts` | `exportKillScan` freeze artifact (schemaVersion + bundleDigest) |
+| `kill-scan-export.ts` | `exportKillScan` / `importKillScan` freeze artifact (schemaVersion + bundleDigest) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
 | `residue-edit.ts` | `setResidueItem` / `addResidueItem` / `removeResidueItem` (edit before open) |
 | `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
 | `ledger-durable.ts` | Opt-in localStorage durable ledger (prefer when present) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
-| `kill-scan.test.ts` | Batch kill scan + exportKillScan digest / bounds / fail-closed |
+| `kill-scan.test.ts` | Batch kill scan + export/importKillScan digest / bounds / fail-closed |
 
 
 ## Live well binding
@@ -119,7 +119,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 
 ## Batch well kill scan
 
-`kill-scan.ts` scans a bounded list of NDIC wells (`MAX_KILL_SCAN_WELLS` = 64) through `buildPacketFromWell` then `checkKillConditions`. No invented volumes. `kill-scan-export.ts` freezes the scan into a downloadable JSON artifact (`schemaVersion` + `bundleDigest`). `/packet` live mode and the wells register offer **Batch kill scan** + **Export JSON** over current search results and a hit table. See [NEXT.md](NEXT.md).
+`kill-scan.ts` scans a bounded list of NDIC wells (`MAX_KILL_SCAN_WELLS` = 64) through `buildPacketFromWell` then `checkKillConditions`. No invented volumes. `kill-scan-export.ts` freezes the scan into a downloadable JSON artifact (`schemaVersion` + `bundleDigest`) and `importKillScan` verifies the same fail-closed. `/packet` live mode and the wells register offer **Batch kill scan** + **Export JSON** + paste/file **Import JSON** over current search results and a hit table. See [NEXT.md](NEXT.md).
 
 ## Advisor answer UI
 

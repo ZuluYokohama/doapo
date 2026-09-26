@@ -2,11 +2,14 @@
  * Batch kill scan UI — scan current well search results (capped).
  * Power of 10: bounded render lists, no recursion.
  * Export JSON downloads a fail-closed freeze artifact (schema + digest).
+ * Import paste/file verifies schemaVersion + bundleDigest into inspector view.
  */
-import { useState } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
+  MAX_KILL_SCAN_JSON_CHARS,
   MAX_KILL_SCAN_WELLS,
   exportKillScan,
+  importKillScan,
   killScanFilename,
   listKillScanHits,
   listPackIds,
@@ -47,6 +50,8 @@ export function BatchKillScanStrip({
   const [hitCount, setHitCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [exportNote, setExportNote] = useState<string | null>(null);
+  const [importPaste, setImportPaste] = useState("");
+  const [importDigest, setImportDigest] = useState<string | null>(null);
 
   const ids = packIds ?? listPackIds();
   const activePack = pack;
@@ -54,6 +59,7 @@ export function BatchKillScanStrip({
   function onScan() {
     setError(null);
     setExportNote(null);
+    setImportDigest(null);
     if (activePack === null) {
       setError("pack required");
       setRows(null);
@@ -106,6 +112,66 @@ export function BatchKillScanStrip({
     setExportNote(
       "exported · digest " + result.bundle.bundleDigest.slice(0, 12) + "…",
     );
+    setImportDigest(null);
+  }
+
+  function applyImportedBundle(
+    bundle: {
+      rows: KillScanRow[];
+      scanned: number;
+      hitCount: number;
+      bundleDigest: string;
+      packId: string;
+    },
+  ): void {
+    console.assert(bundle.bundleDigest.length === 64, "import digest length");
+    console.assert(Array.isArray(bundle.rows), "import rows array");
+    setRows(bundle.rows);
+    setScanned(bundle.scanned);
+    setHitCount(bundle.hitCount);
+    setImportDigest(bundle.bundleDigest);
+    setExportNote(
+      "imported · " +
+        bundle.packId +
+        " · digest " +
+        bundle.bundleDigest.slice(0, 12) +
+        "…",
+    );
+  }
+
+  function onImportText(raw: string): void {
+    setError(null);
+    setExportNote(null);
+    setImportDigest(null);
+    const result = importKillScan(raw);
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    applyImportedBundle(result.bundle);
+  }
+
+  function onImportFileChange(event: ChangeEvent<HTMLInputElement>): void {
+    const input = event.target;
+    const files = input.files;
+    if (!files || files.length < 1) return;
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      onImportText(value);
+      input.value = "";
+    };
+    reader.onerror = () => {
+      setError("file read failed");
+      input.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function onImportPasteSubmit(event: FormEvent): void {
+    event.preventDefault();
+    onImportText(importPaste);
   }
 
   const hits = rows !== null ? listKillScanHits(rows) : [];
@@ -121,7 +187,9 @@ export function BatchKillScanStrip({
       <p className="mt-2 text-sm text-muted">
         Scan up to {MAX_KILL_SCAN_WELLS} current search wells via well→packet→kill
         (no invented volumes). Reports measured kill hits only. Export downloads
-        a fail-closed JSON freeze (schemaVersion + digest).
+        a fail-closed JSON freeze (schemaVersion + digest). Import paste/file
+        verifies digest into this inspector view (cap {MAX_KILL_SCAN_JSON_CHARS}{" "}
+        chars).
       </p>
 
       {showPackSelect ? (
@@ -163,6 +231,42 @@ export function BatchKillScanStrip({
           {wells.length} in view · cap {MAX_KILL_SCAN_WELLS}
         </span>
       </div>
+
+      <form onSubmit={onImportPasteSubmit} className="mt-3 space-y-2">
+        <label className="block text-xs tracking-wide text-muted uppercase">
+          Paste kill-scan JSON
+          <textarea
+            value={importPaste}
+            onChange={(event) => setImportPaste(event.target.value)}
+            rows={3}
+            spellCheck={false}
+            className="mt-1 w-full rounded-md border border-line bg-bg px-3 py-2 font-mono text-xs text-fg"
+            placeholder='{"schemaVersion":"doapo-kill-scan/1",…}'
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+          >
+            Import JSON
+          </button>
+          <label className="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg">
+            Load file
+            <input
+              type="file"
+              accept="application/json,.json,text/plain"
+              onChange={onImportFileChange}
+              className="sr-only"
+            />
+          </label>
+          {importDigest ? (
+            <span className="font-mono text-xs text-muted self-center">
+              digest {importDigest.slice(0, 12)}…
+            </span>
+          ) : null}
+        </div>
+      </form>
 
       {error ? (
         <p className="mt-3 text-sm text-accent" role="alert">
