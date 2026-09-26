@@ -2,7 +2,7 @@
 
 **Dakota Oil & Production Outcomes** — measured well status from the North Dakota Industrial Commission (NDIC) public GIS, plus a multi-domain **issue-resolution packet** schema for fail-closed proposals.
 
-DOAPO reads public permit / spud / well-status data. It does **not** invent monthly volumes, claim unverified organizational relationships, or treat external public pages as field SOP.
+DOAPO reads public permit / spud / well-status data. 
 
 ## Quick start
 
