@@ -31,6 +31,7 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **Advisor answer UI:** `/packet` fills `advisorChecks` into the working packet before open
 - **Durable ledger:** opt-in localStorage persistence (prefer when present; still not durable authority)
 - **Pack import JSON:** paste/file load on `/packet`; validate + session overlay (static registry unchanged)
+- **Multi-subject export zip:** `/packet` bundles evidence JSON for ≤16 subjects into one STORE zip + fail-closed manifest
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 

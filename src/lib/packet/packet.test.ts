@@ -1609,3 +1609,124 @@ test("resolvePack prefers session overlay without mutating registry", () => {
   assert.equal(bakken.ok, true);
   if (bakken.ok) assert.equal(bakken.pack.id, "bakken");
 });
+
+import {
+  MAX_EXPORT_SUBJECTS,
+  MULTI_EVIDENCE_SCHEMA_VERSION,
+  DEFAULT_MULTI_ZIP_FILENAME,
+  MANIFEST_FILENAME,
+  exportMultiSubjectEvidenceZip,
+  buildStoreZip,
+} from "./evidence-zip.ts";
+
+test("exportMultiSubjectEvidenceZip happy path with two subjects", () => {
+  const bakken = exampleHumanOpenCandidate();
+  const duc = exampleDucHumanOpenCandidate();
+  assert.equal(validateIssuePacket(bakken).ok, true);
+  assert.equal(validateIssuePacket(duc).ok, true);
+  assert.notEqual(bakken.subjectId, duc.subjectId);
+
+  let ledger = createLedger();
+  const first = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "multi-0",
+      prevDigest: "",
+      packetSubjectId: bakken.subjectId,
+      note: "bakken",
+    }),
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  ledger = first.ledger;
+  const tip = tipDigest(ledger);
+  const second = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "multi-1",
+      prevDigest: tip as string,
+      packetSubjectId: duc.subjectId,
+      note: "duc",
+    }),
+  );
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  ledger = second.ledger;
+
+  const result = exportMultiSubjectEvidenceZip({
+    packets: [bakken, duc],
+    ledger,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.filename, DEFAULT_MULTI_ZIP_FILENAME);
+  assert.equal(result.manifest.schemaVersion, MULTI_EVIDENCE_SCHEMA_VERSION);
+  assert.equal(result.manifest.subjectCount, 2);
+  assert.equal(result.manifest.entries.length, 2);
+  assert.equal(result.manifest.entries[0].subjectId, bakken.subjectId);
+  assert.equal(result.manifest.entries[1].subjectId, duc.subjectId);
+  assert.equal(result.manifest.ledgerChainOk, true);
+  assert.equal(result.manifest.manifestDigest.length, 64);
+  assert.ok(result.zipBytes.length > 100);
+  assert.ok(MAX_EXPORT_SUBJECTS <= 16);
+  assert.equal(MAX_EXPORT_SUBJECTS, 16);
+
+  const asText = new TextDecoder().decode(result.zipBytes);
+  assert.ok(asText.includes(MANIFEST_FILENAME));
+  assert.ok(asText.includes(evidenceFilename(bakken.subjectId)));
+  assert.ok(asText.includes(evidenceFilename(duc.subjectId)));
+});
+
+test("exportMultiSubjectEvidenceZip fail-closed empty / over-cap / duplicate", () => {
+  const ledger = createLedger();
+  const empty = exportMultiSubjectEvidenceZip({ packets: [], ledger });
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.match(empty.reason, /empty/);
+
+  const bakken = exampleHumanOpenCandidate();
+  const packets: IssuePacket[] = [];
+  let i = 0;
+  while (i < MAX_EXPORT_SUBJECTS + 1) {
+    packets.push({
+      ...bakken,
+      subjectId: "subj-" + String(i),
+    });
+    i += 1;
+  }
+  const over = exportMultiSubjectEvidenceZip({ packets, ledger });
+  assert.equal(over.ok, false);
+  if (!over.ok) assert.match(over.reason, /MAX_EXPORT_SUBJECTS/);
+
+  const dup = exportMultiSubjectEvidenceZip({
+    packets: [bakken, { ...bakken }],
+    ledger,
+  });
+  assert.equal(dup.ok, false);
+  if (!dup.ok) assert.match(dup.reason, /duplicate/);
+});
+
+test("exportMultiSubjectEvidenceZip fail-closed when any subject invalid", () => {
+  const good = exampleHumanOpenCandidate();
+  const bad = exampleAgentSelfOpenStop();
+  assert.equal(validateIssuePacket(bad).ok, false);
+  const result = exportMultiSubjectEvidenceZip({
+    packets: [good, bad],
+    ledger: createLedger(),
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /anti-promotion|subject/);
+  }
+});
+
+test("buildStoreZip round-trip local signature", () => {
+  const data = new TextEncoder().encode('{"ok":true}');
+  const zip = buildStoreZip([{ name: "a.json", data }]);
+  assert.equal(zip[0], 0x50);
+  assert.equal(zip[1], 0x4b);
+  assert.equal(zip[2], 0x03);
+  assert.equal(zip[3], 0x04);
+  const text = new TextDecoder().decode(zip);
+  assert.ok(text.includes("a.json"));
+  assert.ok(text.includes('{"ok":true}'));
+});

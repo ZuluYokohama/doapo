@@ -92,6 +92,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
+| `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
 | `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
@@ -119,6 +120,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Pack import JSON
 
 `pack-import.ts` parses and fail-closed validates a `DomainPack` from bounded JSON (`MAX_PACK_JSON_CHARS`). The static registry is not mutated; `/packet` keeps an imported pack in session state and resolves it via `resolvePack` for live build / kill / advisor. See [NEXT.md](NEXT.md).
+
+## Multi-subject export zip
+
+`evidence-zip.ts` bundles several subjects' evidence JSON into one STORE-only zip (`MAX_EXPORT_SUBJECTS` ≤ 16) with a fail-closed `manifest.json`. Each subject is exported via `exportPacketEvidence`; any failure aborts the whole archive. `/packet` offers checkbox selection and zip download. See [NEXT.md](NEXT.md).
 
 ## How to run tests
 
