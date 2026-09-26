@@ -18,9 +18,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | **OPEN** (landed) |
 | Evidence bundle import | Parse + verify exported JSON (digest/chain) into working packet | **OPEN** (landed) |
 | Residue editor UI | Edit residue items on /packet before open | **OPEN** (landed) |
-| Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (this PR) |
-| Cross-pack kill audit | Same well set scanned across ≥2 packs; compare hit tables | **STOP** |
+| Batch well kill scan | Scan N wells for kill facts / status rules | **OPEN** (landed) |
+| Cross-pack kill audit | One packet audited against every registered pack (+ overlay); hit table | **OPEN** (this PR) |
 | Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **STOP** |
+| Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -103,10 +104,19 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet`: **Residue editor** strip lists items (bounded); apply / add / remove update working packet used by validate / evaluate / open / export
 - `evaluatePacket` + kill gate unchanged; residue still drives RESIDUE verdict when non-empty
 
-## Batch well kill scan — OPEN (this PR)
+## Batch well kill scan — OPEN (landed)
 
 - `kill-scan.ts`: `scanWellsForKills` + `listKillScanHits` (fail-closed)
 - Cap `MAX_KILL_SCAN_WELLS` (64); only `buildPacketFromWell` → `checkKillConditions` (no invented volumes)
 - Result rows: `{ subjectId, wellLabel, hit, killId?, reason? }`; build/check failures record `reason`
 - `/packet` live mode + wells register: **Batch kill scan** button over current search results; hit table
-- Named next STOP: cross-pack kill audit; outcome cohort summary
+
+## Cross-pack kill audit — OPEN (this PR)
+
+- `kill-audit.ts`: `auditKillsAcrossPacks` + `auditPacketKills` + `listPacksForAudit` (fail-closed)
+- Cap `MAX_AUDIT_PACKS` (= `MAX_REGISTERED_PACKS`); empty packs list → fail-closed
+- Same measured facts packet; `checkKillConditions(pack, packet)` per pack (facts are pack-agnostic kill ids)
+- Optional session overlay: prefer matching id / append if new (`mergePacksForAudit`)
+- Result rows: `{ packId, packVersion, hit, killId?, reason? }`
+- `/packet`: **Cross-pack kill audit** strip when packet validates; full pack table + hit count
+- Named next STOP: outcome cohort summary; kill fact authoring UI
