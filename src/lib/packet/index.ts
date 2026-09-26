@@ -153,3 +153,15 @@ export {
   type ExportEvidenceInput,
 } from "./evidence-export.ts";
 
+export {
+  MAX_EXPORT_SUBJECTS,
+  MULTI_EVIDENCE_SCHEMA_VERSION,
+  DEFAULT_MULTI_ZIP_FILENAME,
+  MANIFEST_FILENAME,
+  exportMultiSubjectEvidenceZip,
+  buildStoreZip,
+  type MultiSubjectManifestEntry,
+  type MultiSubjectManifest,
+  type ExportMultiSubjectInput,
+  type ExportMultiSubjectResult,
+} from "./evidence-zip.ts";

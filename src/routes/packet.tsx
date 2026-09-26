@@ -22,6 +22,8 @@ import {
   evaluatePacket,
   evidenceFilename,
   exportPacketEvidence,
+  exportMultiSubjectEvidenceZip,
+  MAX_EXPORT_SUBJECTS,
   listPackIds,
   listRecentSeals,
   listSealsForSubject,
@@ -453,6 +455,20 @@ function downloadJsonFile(json: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+function downloadZipFile(bytes: Uint8Array, filename: string): void {
+  console.assert(bytes.length > 0, "download zip present");
+  console.assert(filename.length > 0, "download zip name present");
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  const blob = new Blob([copy], { type: "application/zip" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 
 
 function KillCheckStrip({
@@ -554,6 +570,113 @@ function EvidenceExportStrip({
         className="mt-3 min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
       >
         Export evidence
+      </button>
+    </section>
+  );
+}
+
+type MultiSubjectOption = {
+  id: string;
+  label: string;
+  packet: IssuePacket;
+};
+
+function MultiSubjectExportStrip({
+  options,
+  ledger,
+  onError,
+}: {
+  options: MultiSubjectOption[];
+  ledger: SealLedger;
+  onError: (reason: string | null) => void;
+}) {
+  const [selected, setSelected] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    let i = 0;
+    while (i < options.length && i < MAX_EXPORT_SUBJECTS) {
+      init[options[i].id] = true;
+      i += 1;
+    }
+    return init;
+  });
+
+  if (options.length === 0) return null;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = { ...prev };
+      next[id] = !prev[id];
+      return next;
+    });
+  }
+
+  function onExportZip() {
+    const packets: IssuePacket[] = [];
+    let i = 0;
+    while (i < options.length) {
+      const row = options[i];
+      if (selected[row.id]) {
+        packets.push(row.packet);
+      }
+      i += 1;
+    }
+    console.assert(packets.length <= MAX_EXPORT_SUBJECTS, "ui within subject cap");
+    const result = exportMultiSubjectEvidenceZip({
+      packets,
+      ledger,
+      notes: DEFAULT_EXPORT_NOTES,
+    });
+    if (!result.ok) {
+      onError(result.reason);
+      return;
+    }
+    onError(null);
+    downloadZipFile(result.zipBytes, result.filename);
+  }
+
+  const selectedCount = (() => {
+    let n = 0;
+    let j = 0;
+    while (j < options.length) {
+      if (selected[options[j].id]) n += 1;
+      j += 1;
+    }
+    return n;
+  })();
+
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Multi-subject export zip
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Bundle evidence JSON for up to {MAX_EXPORT_SUBJECTS} subjects into one
+        STORE-only zip with a fail-closed manifest. Demo artifact — not durable
+        authority; humans still own OPEN.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {options.map((row) => (
+          <li key={row.id} className="flex items-center gap-2 text-sm text-fg">
+            <input
+              id={"multi-export-" + row.id}
+              type="checkbox"
+              checked={Boolean(selected[row.id])}
+              onChange={() => toggle(row.id)}
+              className="h-4 w-4"
+            />
+            <label htmlFor={"multi-export-" + row.id} className="font-mono">
+              {row.label}
+            </label>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => onExportZip()}
+        disabled={selectedCount === 0}
+        className="mt-3 min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
+      >
+        Export zip ({selectedCount})
       </button>
     </section>
   );
@@ -1285,6 +1408,43 @@ function PacketPage() {
     [packet],
   );
 
+  const multiExportOptions = useMemo((): MultiSubjectOption[] => {
+    const rows: MultiSubjectOption[] = [];
+    const bakken = exampleHumanOpenCandidate();
+    if (validateIssuePacket(bakken).ok) {
+      rows.push({
+        id: bakken.subjectId,
+        label: "Bakken — " + bakken.subjectId,
+        packet: bakken,
+      });
+    }
+    const duc = exampleDucHumanOpenCandidate();
+    if (validateIssuePacket(duc).ok) {
+      rows.push({
+        id: duc.subjectId,
+        label: "DUC — " + duc.subjectId,
+        packet: duc,
+      });
+    }
+    if (
+      packet &&
+      validation !== null &&
+      validation.ok &&
+      packet.subjectId !== bakken.subjectId &&
+      packet.subjectId !== duc.subjectId
+    ) {
+      rows.push({
+        id: packet.subjectId,
+        label: "Current — " + packet.subjectId,
+        packet,
+      });
+    }
+    if (rows.length > MAX_EXPORT_SUBJECTS) {
+      return rows.slice(0, MAX_EXPORT_SUBJECTS);
+    }
+    return rows;
+  }, [packet, validation]);
+
   const inspectorPackLookup = packet
     ? resolvePack(packet.packId, importedPack)
     : packLookup;
@@ -1477,6 +1637,11 @@ function PacketPage() {
           packet={packet}
           ledger={sessionLedger}
           validationOk={validation !== null && validation.ok}
+          onError={setExportError}
+        />
+        <MultiSubjectExportStrip
+          options={multiExportOptions}
+          ledger={sessionLedger}
           onError={setExportError}
         />
         {pageMode === "live" && !packet ? (
