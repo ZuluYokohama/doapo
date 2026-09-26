@@ -92,6 +92,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `derive-from-well.ts` | Measured DUC/status derivation → residue + kill hints (status / spud age) |
+| `prioritize.ts` | Operator / DUC prioritization from live search (`prioritizeWells` / `prioritizeOperators`) |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence` / `importEvidenceBundle`) |
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
@@ -117,6 +118,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Measured DUC/status derivation
 
 `deriveFromWell` emits `days-since-spud` when spud is present; adds `confidential-lag` residue for Confidential / sealed; adds `duc-age` residue when NC days ≥ `DUC_AGE_DAYS_THRESHOLD` (365); and, when the pack declares kill `stale-duc` (`bakken-duc`), sets `kill:stale-duc=triggered`. Fail-closed; no invented volumes. Live `/packet` build inherits this path; kill-fact authoring remains for overrides. **Freeze:** do not add another export/import STOP gate — prefer info→value derivation.
+
+## Operator / DUC prioritization
+
+`prioritizeWells` / `prioritizeOperators` rank capped live-search wells by measured status and `daysSinceSpud` (stale DUC first). Operator rollup counts DUC / stale / sealed. UI on wells + `/packet` live beside cohort / kill-scan. **No** new export/import strip. See [NEXT.md](NEXT.md).
 
 ## Evidence export / import
 

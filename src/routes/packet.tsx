@@ -6,6 +6,7 @@ import { ResidueEditorStrip } from "@/components/residue-editor-strip";
 import { KillFactAuthoringStrip } from "@/components/kill-fact-authoring-strip";
 import { BatchKillScanStrip } from "@/components/batch-kill-scan-strip";
 import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
+import { PrioritizeStrip } from "@/components/prioritize-strip";
 import { CrossPackKillAuditStrip } from "@/components/cross-pack-kill-audit-strip";
 import {
   exampleAgentSelfOpenStop,
@@ -1763,6 +1764,7 @@ function PacketPage() {
             wells={results}
             pack={packLookup.ok ? packLookup.pack : null}
           />
+          <PrioritizeStrip wells={results} />
         </div>
       )}
 

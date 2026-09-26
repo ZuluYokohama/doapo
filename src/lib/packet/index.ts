@@ -251,6 +251,21 @@ export {
 } from "./derive-from-well.ts";
 
 export {
+  MAX_PRIORITIZE_WELLS,
+  MAX_PRIORITIZE_OPERATORS,
+  MAX_DAYS_IN_PRIORITY,
+  prioritizeWells,
+  prioritizeOperators,
+  priorityScore,
+  type PrioritizeMode,
+  type PrioritizeWellRow,
+  type PrioritizeOperatorRow,
+  type PrioritizeWellsInput,
+  type PrioritizeWellsResult,
+  type PrioritizeOperatorsResult,
+} from "./prioritize.ts";
+
+export {
   EVIDENCE_SCHEMA_VERSION,
   EXPORT_SEAL_CAP,
   DEFAULT_EXPORT_NOTES,
