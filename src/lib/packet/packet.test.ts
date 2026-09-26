@@ -433,16 +433,24 @@ test("openCandidate from human_open yields OPEN_CANDIDATE", () => {
 
 import {
   MAX_SEALS,
+  UI_LEDGER_CAP,
   appendOpenSeal,
   appendSeal,
   computeSealDigest,
+  countSealsForSubject,
   createLedger,
   listRecentSeals,
   listSeals,
+  listSealsForSubject,
   sealFromPacket,
   tipDigest,
+  verifySealChain,
   type SealAppendInput,
 } from "./ledger.ts";
+import {
+  LEDGER_STORE_VERSION,
+  parseStoredLedger,
+} from "./ledger-store.ts";
 
 function makeSealInput(
   overrides: Partial<SealAppendInput> & Pick<SealAppendInput, "id" | "prevDigest">,
@@ -637,3 +645,134 @@ test("sealFromPacket and appendOpenSeal after openCandidate", () => {
     assert.equal(recent.length, 2);
   }
 });
+
+
+test("listSealsForSubject filters and caps; empty subject fail-closed", () => {
+  let ledger = createLedger();
+  const subjects = ["alpha", "beta", "alpha", "gamma", "alpha"];
+  let i = 0;
+  while (i < subjects.length) {
+    const tip = tipDigest(ledger);
+    const r = appendSeal(
+      ledger,
+      makeSealInput({
+        id: "s-" + String(i),
+        prevDigest: tip === null ? "" : tip,
+        packetSubjectId: subjects[i],
+        note: "n-" + subjects[i],
+      }),
+    );
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    ledger = r.ledger;
+    i += 1;
+  }
+  const alpha = listSealsForSubject(ledger, "alpha");
+  assert.equal(alpha.length, 3);
+  assert.equal(alpha[0].packetSubjectId, "alpha");
+  assert.equal(alpha[1].packetSubjectId, "alpha");
+  assert.equal(alpha[2].packetSubjectId, "alpha");
+  assert.equal(countSealsForSubject(ledger, "alpha"), 3);
+  assert.equal(countSealsForSubject(ledger, "beta"), 1);
+  assert.equal(listSealsForSubject(ledger, "").length, 0);
+  assert.equal(countSealsForSubject(ledger, ""), 0);
+  assert.equal(listSealsForSubject(ledger, "missing").length, 0);
+  const capped = listSealsForSubject(ledger, "alpha", 2);
+  assert.equal(capped.length, 2);
+  assert.equal(capped[0].id, "s-2");
+  assert.equal(capped[1].id, "s-4");
+  assert.ok(capped.length <= UI_LEDGER_CAP);
+  const chain = verifySealChain(ledger);
+  assert.equal(chain.ok, true);
+  let j = 0;
+  while (j < alpha.length) {
+    const row = alpha[j];
+    const recomputed = computeSealDigest({
+      id: row.id,
+      atIso: row.atIso,
+      kind: row.kind,
+      packetSubjectId: row.packetSubjectId,
+      packId: row.packId,
+      gate: row.gate,
+      proposedBy: row.proposedBy,
+      prevDigest: row.prevDigest,
+      note: row.note,
+    });
+    assert.equal(recomputed, row.digest);
+    j += 1;
+  }
+});
+
+test("verifySealChain rejects tampered digest", () => {
+  const g = appendSeal(
+    createLedger(),
+    makeSealInput({ id: "seal-0", prevDigest: "" }),
+  );
+  assert.equal(g.ok, true);
+  if (!g.ok) return;
+  assert.equal(verifySealChain(g.ledger).ok, true);
+  const broken = {
+    seals: [
+      {
+        ...g.ledger.seals[0],
+        digest: "0".repeat(64),
+      },
+    ],
+  };
+  const bad = verifySealChain(broken);
+  assert.equal(bad.ok, false);
+  if (!bad.ok) {
+    assert.match(bad.reason, /digest mismatch/);
+  }
+});
+
+test("parseStoredLedger fail-closed on corrupt / broken chain", () => {
+  const empty = parseStoredLedger("");
+  assert.equal(empty.ledger.seals.length, 0);
+  assert.ok(empty.reason !== null);
+
+  const g = appendSeal(
+    createLedger(),
+    makeSealInput({ id: "seal-0", prevDigest: "", packetSubjectId: "subj-a" }),
+  );
+  assert.equal(g.ok, true);
+  if (!g.ok) return;
+  const tip = tipDigest(g.ledger);
+  const next = appendSeal(
+    g.ledger,
+    makeSealInput({
+      id: "seal-1",
+      prevDigest: tip as string,
+      packetSubjectId: "subj-a",
+    }),
+  );
+  assert.equal(next.ok, true);
+  if (!next.ok) return;
+
+  const goodRaw = JSON.stringify({
+    version: LEDGER_STORE_VERSION,
+    seals: next.ledger.seals,
+  });
+  const good = parseStoredLedger(goodRaw);
+  assert.equal(good.reason, null);
+  assert.equal(good.ledger.seals.length, 2);
+
+  const brokenRaw = JSON.stringify({
+    version: LEDGER_STORE_VERSION,
+    seals: [
+      next.ledger.seals[0],
+      { ...next.ledger.seals[1], prevDigest: "deadbeef".repeat(8) },
+    ],
+  });
+  const broken = parseStoredLedger(brokenRaw);
+  assert.equal(broken.ledger.seals.length, 0);
+  assert.ok(broken.reason !== null);
+  assert.match(String(broken.reason), /chain|prevDigest|digest/i);
+
+  const badVersion = parseStoredLedger(
+    JSON.stringify({ version: 999, seals: [] }),
+  );
+  assert.equal(badVersion.ledger.seals.length, 0);
+  assert.match(String(badVersion.reason), /version/);
+});
+

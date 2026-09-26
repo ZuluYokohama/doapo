@@ -6,6 +6,7 @@ import { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
 import {
   MAX_WELL_FACTS,
   buildPacketFromWell,
+  wellSubjectId,
   wellToMeasuredFacts,
 } from "./from-well.ts";
 import { validateIssuePacket } from "./validate.ts";
@@ -181,4 +182,24 @@ test("wellToMeasuredFacts skips null optional fields and stays bounded", () => {
   assert.equal(keys.includes("field"), false);
   assert.equal(keys.includes("td"), false);
   assert.equal(keys.includes("spud"), false);
+});
+
+test("wellSubjectId matches buildPacketFromWell subjectId", () => {
+  const well = sampleWell();
+  const id = wellSubjectId(well);
+  assert.ok(id !== null);
+  const built = buildPacketFromWell({
+    well,
+    pack: BAKKEN_PACK,
+    proposedBy: "agent_propose",
+    gate: "STOP",
+  });
+  assert.equal(built.ok, true);
+  if (!built.ok) return;
+  assert.equal(id, built.packet.subjectId);
+});
+
+test("wellSubjectId fail-closed without api or fileNo", () => {
+  const id = wellSubjectId(sampleWell({ api: null, fileNo: null }));
+  assert.equal(id, null);
 });

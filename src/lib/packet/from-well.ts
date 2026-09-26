@@ -182,6 +182,19 @@ function subjectFromWell(well: WellRow): { id: string; label: string } | null {
   return null;
 }
 
+
+/**
+ * Stable packet subject id for a well (same algorithm as buildPacketFromWell).
+ * Fail-closed: null when api and fileNo are both missing/empty.
+ */
+export function wellSubjectId(well: WellRow): string | null {
+  console.assert(well !== null && well !== undefined, "well present");
+  const subject = subjectFromWell(well);
+  if (subject === null) return null;
+  console.assert(subject.id.length > 0, "subject id non-empty");
+  return subject.id;
+}
+
 /**
  * Build an issue packet from a live NDIC well + domain pack.
  * Residue defaults are copied from the pack. No invented volumes.

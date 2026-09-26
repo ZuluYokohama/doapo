@@ -12,6 +12,14 @@ import {
 import { RefreshCw, Search } from "lucide-react";
 import { searchWells } from "@/lib/ndic.functions";
 import {
+  UI_LEDGER_CAP,
+  countSealsForSubject,
+  listSealsForSubject,
+  loadSessionLedger,
+  wellSubjectId,
+  type SealRecord,
+} from "@/lib/packet";
+import {
   OUTCOMES,
   countStatuses,
   formatApi,
@@ -568,6 +576,65 @@ export function DoapoApp({
   );
 }
 
+
+function shortDigest(hex: string): string {
+  if (hex.length <= 12) return hex;
+  return hex.slice(0, 8) + "…" + hex.slice(hex.length - 4);
+}
+
+function WellPacketHistory({ well }: { well: WellRow }) {
+  const subjectId = wellSubjectId(well);
+  const loaded = loadSessionLedger();
+  const count =
+    subjectId !== null ? countSealsForSubject(loaded.ledger, subjectId) : 0;
+  const recent: SealRecord[] =
+    subjectId !== null
+      ? listSealsForSubject(loaded.ledger, subjectId, UI_LEDGER_CAP)
+      : [];
+  console.assert(recent.length <= UI_LEDGER_CAP, "history within UI cap");
+  return (
+    <div className="mt-3 rounded-md border border-line bg-raised px-3 py-2">
+      <p className="text-xs tracking-widest text-accent uppercase">
+        Packet history
+      </p>
+      <p className="mt-1 font-mono text-xs text-muted">
+        Subject{" "}
+        {subjectId !== null ? subjectId : "—"} · {count} seal
+        {count === 1 ? "" : "s"} (session)
+      </p>
+      {subjectId === null ? (
+        <p className="mt-2 text-sm text-muted">
+          No subject id (missing API and file no).
+        </p>
+      ) : recent.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">
+          No seals for this well yet. Open packet and run the runtime path.
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {recent.map((row) => (
+            <li key={row.id + "-" + row.digest} className="text-sm">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="font-mono text-fg">{row.kind}</span>
+                <span className="text-xs tracking-wide text-muted uppercase">
+                  {row.gate}
+                </span>
+              </div>
+              <p className="mt-0.5 font-mono text-xs text-muted">{row.atIso}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted">
+                {shortDigest(row.digest)}
+              </p>
+              {row.note.length > 0 ? (
+                <p className="mt-0.5 text-muted">{row.note}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function WellDetail({ well }: { well: WellRow | null }) {
   if (!well) {
     return (
@@ -596,6 +663,7 @@ function WellDetail({ well }: { well: WellRow | null }) {
       <h2 className="mt-1 text-xl font-medium text-fg">{well.wellName ?? "Unnamed well"}</h2>
       <p className="mt-1 text-sm text-muted">{well.operator ?? "Unknown operator"}</p>
       <p className="mt-3 text-sm leading-relaxed text-fg">{outcomeSentence(well)}</p>
+      <WellPacketHistory well={well} />
       {well.api ? (
         <p className="mt-3">
           <Link
