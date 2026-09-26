@@ -278,7 +278,7 @@ export function listRecentSeals(
 
 
 /**
- * Seals for one subject, chronological, hard-capped.
+ * Seals for one subject, chronological, hard-capped (default UI_LEDGER_CAP; max MAX_SEALS).
  * Fail-closed: empty / non-string subjectId → [].
  */
 export function listSealsForSubject(
@@ -294,7 +294,7 @@ export function listSealsForSubject(
   if (subjectId.length > MAX_ID_LEN) {
     return [];
   }
-  const bound = cap < 1 ? 1 : cap > UI_LEDGER_CAP ? UI_LEDGER_CAP : cap;
+  const bound = cap < 1 ? 1 : cap > MAX_SEALS ? MAX_SEALS : cap;
   const matched: SealRecord[] = [];
   const n = ledger.seals.length;
   let i = 0;

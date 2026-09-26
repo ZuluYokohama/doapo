@@ -104,3 +104,14 @@ export {
   type BuildPacketResult,
 } from "./from-well.ts";
 
+export {
+  EVIDENCE_SCHEMA_VERSION,
+  EXPORT_SEAL_CAP,
+  DEFAULT_EXPORT_NOTES,
+  exportPacketEvidence,
+  evidenceFilename,
+  type PacketEvidenceBundle,
+  type ExportEvidenceResult,
+  type ExportEvidenceInput,
+} from "./evidence-export.ts";
+

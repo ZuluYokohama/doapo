@@ -776,3 +776,153 @@ test("parseStoredLedger fail-closed on corrupt / broken chain", () => {
   assert.match(String(badVersion.reason), /version/);
 });
 
+
+import {
+  DEFAULT_EXPORT_NOTES,
+  EVIDENCE_SCHEMA_VERSION,
+  EXPORT_SEAL_CAP,
+  evidenceFilename,
+  exportPacketEvidence,
+} from "./evidence-export.ts";
+
+test("exportPacketEvidence happy path with subject seals", () => {
+  const packet = exampleHumanOpenCandidate();
+  assert.equal(validateIssuePacket(packet).ok, true);
+  let ledger = createLedger();
+  const first = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "exp-0",
+      prevDigest: "",
+      packetSubjectId: packet.subjectId,
+      note: "propose",
+    }),
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  ledger = first.ledger;
+  const tip = tipDigest(ledger);
+  const second = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "exp-1",
+      prevDigest: tip as string,
+      packetSubjectId: "other-subject",
+      note: "other",
+    }),
+  );
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  ledger = second.ledger;
+  const tip2 = tipDigest(ledger);
+  const third = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "exp-2",
+      prevDigest: tip2 as string,
+      packetSubjectId: packet.subjectId,
+      note: "open",
+      kind: "open",
+      gate: "OPEN_CANDIDATE",
+      proposedBy: "human_open",
+    }),
+  );
+  assert.equal(third.ok, true);
+  if (!third.ok) return;
+  ledger = third.ledger;
+
+  const result = exportPacketEvidence({ packet, ledger });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.schemaVersion, EVIDENCE_SCHEMA_VERSION);
+  assert.equal(result.bundle.subjectId, packet.subjectId);
+  assert.equal(result.bundle.packId, packet.packId);
+  assert.equal(result.bundle.seals.length, 2);
+  assert.equal(result.bundle.seals[0].id, "exp-0");
+  assert.equal(result.bundle.seals[1].id, "exp-2");
+  assert.equal(result.bundle.chainOk, true);
+  assert.equal(result.bundle.tipDigest, tipDigest(ledger));
+  assert.equal(result.bundle.bundleDigest.length, 64);
+  assert.match(result.bundle.notes, /demo export|not durable/i);
+  assert.ok(result.json.includes(packet.subjectId));
+  assert.ok(EXPORT_SEAL_CAP <= MAX_SEALS);
+  assert.ok(EXPORT_SEAL_CAP > UI_LEDGER_CAP);
+});
+
+test("exportPacketEvidence empty subject seals still ok", () => {
+  const packet = exampleHumanOpenCandidate();
+  const ledger = createLedger();
+  const result = exportPacketEvidence({
+    packet,
+    ledger,
+    notes: DEFAULT_EXPORT_NOTES,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.seals.length, 0);
+  assert.equal(result.bundle.chainOk, true);
+  assert.equal(result.bundle.tipDigest, null);
+});
+
+test("exportPacketEvidence validate failure → ok:false", () => {
+  const bad = exampleAgentSelfOpenStop();
+  assert.equal(validateIssuePacket(bad).ok, false);
+  const result = exportPacketEvidence({
+    packet: bad,
+    ledger: createLedger(),
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /anti-promotion/);
+  }
+});
+
+test("exportPacketEvidence unknown pack fail-closed", () => {
+  const packet = exampleHumanOpenCandidate();
+  const orphan: IssuePacket = {
+    ...packet,
+    packId: "no-such-pack",
+  };
+  const result = exportPacketEvidence({
+    packet: orphan,
+    ledger: createLedger(),
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /unknown pack/i);
+  }
+});
+
+test("exportPacketEvidence chainOk false on tampered ledger", () => {
+  const packet = exampleHumanOpenCandidate();
+  const g = appendSeal(
+    createLedger(),
+    makeSealInput({
+      id: "tamper-0",
+      prevDigest: "",
+      packetSubjectId: packet.subjectId,
+    }),
+  );
+  assert.equal(g.ok, true);
+  if (!g.ok) return;
+  const broken = {
+    seals: [{ ...g.ledger.seals[0], digest: "0".repeat(64) }],
+  };
+  assert.equal(verifySealChain(broken).ok, false);
+  const result = exportPacketEvidence({ packet, ledger: broken });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.chainOk, false);
+  assert.equal(result.bundle.seals.length, 1);
+});
+
+test("evidenceFilename sanitizes and truncates", () => {
+  assert.equal(evidenceFilename("fixture-human-open"), "packet-evidence-fixture-human-open.json");
+  assert.equal(evidenceFilename("a/b:c"), "packet-evidence-a_b_c.json");
+  assert.equal(evidenceFilename(""), "packet-evidence-unknown.json");
+  const long = "x".repeat(80);
+  const name = evidenceFilename(long);
+  assert.ok(name.startsWith("packet-evidence-"));
+  assert.ok(name.endsWith(".json"));
+  assert.ok(name.length < 80);
+});
