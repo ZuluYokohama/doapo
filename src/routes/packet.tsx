@@ -25,10 +25,14 @@ import {
   listPackIds,
   listRecentSeals,
   listSealsForSubject,
+  clearDurableLedger,
+  loadPreferredLedger,
   loadSessionLedger,
   lookupPack,
   openCandidate,
+  persistSessionToDurable,
   proposePacket,
+  saveDurableLedger,
   saveSessionLedger,
   sealFromPacket,
   tipDigest,
@@ -271,8 +275,9 @@ function RuntimePathStrip({ steps }: { steps: RuntimeStep[] }) {
         Runtime path
       </h2>
       <p className="mt-2 text-sm text-muted">
-        Demo path: propose → evaluate → open. Seals append to the tab session
-        ledger. Agent path cannot reach OPEN_CANDIDATE; only human_open may stamp it.
+        Demo path: propose → evaluate → open. Seals append to the active
+        ledger (session or durable). Agent path cannot reach OPEN_CANDIDATE;
+        only human_open may stamp it.
       </p>
       <ol className="mt-3 space-y-2">
         {steps.map((step) => (
@@ -311,8 +316,9 @@ function LedgerStrip({ ledger }: { ledger: SealLedger }) {
     <section className="mb-4 rounded-md border border-line bg-surface p-4">
       <h2 className="text-xs tracking-widest text-accent uppercase">Ledger</h2>
       <p className="mt-2 text-sm text-muted">
-        Append-only session ledger (cap {UI_LEDGER_CAP} shown). Demo persistence
-        via sessionStorage — not durable authority. Tip is the chain head digest.
+        Append-only ledger (cap {UI_LEDGER_CAP} shown). Session is ephemeral
+        (tab); durable opt-in survives tab close via localStorage — still not
+        durable authority. Tip is the chain head digest.
       </p>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
@@ -380,7 +386,7 @@ function PacketHistoryStrip({
         Packet history
       </h2>
       <p className="mt-2 text-sm text-muted">
-        Seals for this subject from the session ledger (cap {UI_LEDGER_CAP}{" "}
+        Seals for this subject from the active ledger (cap {UI_LEDGER_CAP}{" "}
         shown). Filtered by subjectId — not a full-chain rewrite.
       </p>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -535,8 +541,8 @@ function EvidenceExportStrip({
       </h2>
       <p className="mt-2 text-sm text-muted">
         Download a fail-closed freeze artifact: validated packet, subject seals,
-        tip, and chain verify. Demo session ledger — not durable authority;
-        humans still own OPEN.
+        tip, and chain verify. Uses the active demo ledger (session or durable
+        opt-in) — not durable authority; humans still own OPEN.
       </p>
       <button
         type="button"
@@ -691,6 +697,75 @@ function LiveWellPanel({
   );
 }
 
+function DurableLedgerStrip({
+  source,
+  sealCount,
+  storeReason,
+  onPersist,
+  onClearDurable,
+  onUseSession,
+}: {
+  source: "session" | "durable";
+  sealCount: number;
+  storeReason: string | null;
+  onPersist: () => void;
+  onClearDurable: () => void;
+  onUseSession: () => void;
+}) {
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Ledger persistence
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Demo vs durable: session ends with the tab; Persist ledger copies the
+        current chain to localStorage (verify on load; corrupt → empty). Prefer
+        durable when present. Still not durable authority — humans own OPEN.
+      </p>
+      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-muted uppercase">Active store</dt>
+          <dd className="font-mono text-fg">{source}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted uppercase">Seals</dt>
+          <dd className="font-mono text-fg">{sealCount}</dd>
+        </div>
+      </dl>
+      {storeReason ? (
+        <p className="mt-3 text-sm text-muted" role="status">
+          Store: {storeReason}
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onPersist()}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+        >
+          Persist ledger
+        </button>
+        {source === "durable" ? (
+          <button
+            type="button"
+            onClick={() => onUseSession()}
+            className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+          >
+            Use session only
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => onClearDurable()}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+        >
+          Clear durable
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function PacketPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -717,6 +792,9 @@ function PacketPage() {
     createLedger(),
   );
   const [storeReason, setStoreReason] = useState<string | null>(null);
+  const [ledgerSource, setLedgerSource] = useState<"session" | "durable">(
+    "session",
+  );
   const [exportError, setExportError] = useState<string | null>(null);
   const [fixtureRuntimeSteps, setFixtureRuntimeSteps] = useState<
     RuntimeStep[] | null
@@ -734,9 +812,11 @@ function PacketPage() {
   } | null>(null);
 
   useEffect(() => {
-    const loaded = loadSessionLedger();
-    setSessionLedger(loaded.ledger);
-    setStoreReason(loaded.reason);
+    const session = loadSessionLedger();
+    const preferred = loadPreferredLedger(session);
+    setSessionLedger(preferred.ledger);
+    setLedgerSource(preferred.source);
+    setStoreReason(preferred.reason);
   }, []);
 
   useEffect(() => {
@@ -880,12 +960,48 @@ function PacketPage() {
   function persistLedger(next: SealLedger) {
     console.assert(next.seals.length <= 256, "persist within MAX_SEALS");
     setSessionLedger(next);
-    const saved = saveSessionLedger(next);
-    setStoreReason(saved.ok ? null : saved.reason);
+    const sessionSaved = saveSessionLedger(next);
+    if (ledgerSource === "durable") {
+      const durableSaved = saveDurableLedger(next);
+      setStoreReason(
+        durableSaved.ok
+          ? sessionSaved.ok
+            ? null
+            : sessionSaved.reason
+          : durableSaved.reason,
+      );
+      return;
+    }
+    setStoreReason(sessionSaved.ok ? null : sessionSaved.reason);
+  }
+
+  function onPersistToDurable() {
+    const saved = persistSessionToDurable(sessionLedger);
+    if (!saved.ok) {
+      setStoreReason(saved.reason);
+      return;
+    }
+    setLedgerSource("durable");
+    setStoreReason(null);
+  }
+
+  function onClearDurable() {
+    clearDurableLedger();
+    const session = loadSessionLedger();
+    setSessionLedger(session.ledger);
+    setLedgerSource("session");
+    setStoreReason(session.reason);
+  }
+
+  function onUseSessionOnly() {
+    const session = loadSessionLedger();
+    setSessionLedger(session.ledger);
+    setLedgerSource("session");
+    setStoreReason(session.reason);
   }
 
   function runFixtureRuntime() {
-    const base = loadSessionLedger().ledger;
+    const base = sessionLedger;
     const seed =
       answerDraft !== null && answerDraft.packet.packId.length > 0
         ? {
@@ -903,7 +1019,7 @@ function PacketPage() {
 
   function runLiveRuntimePath() {
     if (!livePacket) return;
-    const base = loadSessionLedger().ledger;
+    const base = sessionLedger;
     const seed =
       answerDraft !== null &&
       answerDraft.packet.subjectId === livePacket.subjectId
@@ -1128,11 +1244,14 @@ function PacketPage() {
         {pageMode === "live" && liveRuntimeSteps ? (
           <RuntimePathStrip steps={liveRuntimeSteps} />
         ) : null}
-        {storeReason ? (
-          <p className="mb-4 text-sm text-muted" role="status">
-            Session ledger: {storeReason}
-          </p>
-        ) : null}
+        <DurableLedgerStrip
+          source={ledgerSource}
+          sealCount={sessionLedger.seals.length}
+          storeReason={storeReason}
+          onPersist={onPersistToDurable}
+          onClearDurable={onClearDurable}
+          onUseSession={onUseSessionOnly}
+        />
         <LedgerStrip ledger={sessionLedger} />
         <PacketHistoryStrip
           ledger={sessionLedger}

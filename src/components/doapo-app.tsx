@@ -15,6 +15,7 @@ import {
   UI_LEDGER_CAP,
   countSealsForSubject,
   listSealsForSubject,
+  loadPreferredLedger,
   loadSessionLedger,
   wellSubjectId,
   type SealRecord,
@@ -584,12 +585,14 @@ function shortDigest(hex: string): string {
 
 function WellPacketHistory({ well }: { well: WellRow }) {
   const subjectId = wellSubjectId(well);
-  const loaded = loadSessionLedger();
+  const preferred = loadPreferredLedger(loadSessionLedger());
   const count =
-    subjectId !== null ? countSealsForSubject(loaded.ledger, subjectId) : 0;
+    subjectId !== null
+      ? countSealsForSubject(preferred.ledger, subjectId)
+      : 0;
   const recent: SealRecord[] =
     subjectId !== null
-      ? listSealsForSubject(loaded.ledger, subjectId, UI_LEDGER_CAP)
+      ? listSealsForSubject(preferred.ledger, subjectId, UI_LEDGER_CAP)
       : [];
   console.assert(recent.length <= UI_LEDGER_CAP, "history within UI cap");
   return (
@@ -600,7 +603,7 @@ function WellPacketHistory({ well }: { well: WellRow }) {
       <p className="mt-1 font-mono text-xs text-muted">
         Subject{" "}
         {subjectId !== null ? subjectId : "—"} · {count} seal
-        {count === 1 ? "" : "s"} (session)
+        {count === 1 ? "" : "s"} ({preferred.source})
       </p>
       {subjectId === null ? (
         <p className="mt-2 text-sm text-muted">

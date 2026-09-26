@@ -12,8 +12,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Well packet history | Subject-scoped seal list + session ledger store for `/packet` and wells detail | **OPEN** (landed) |
 | Auditable packet export | Downloadable evidence bundle: packet + subject seals + tip + chain verify | **OPEN** (landed) |
 | Kill-condition runtime check | Evaluate pack killConditions against packet measured facts / answers → forced STOP | **OPEN** (landed) |
-| Advisor answer UI | Human/evaluator fill advisorChecks on `/packet` before open | **OPEN** (this PR) |
-| Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | STOP |
+| Advisor answer UI | Human/evaluator fill advisorChecks on `/packet` before open | **OPEN** (landed) |
+| Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | **OPEN** (this PR) |
+| Pack import JSON | Import a domain pack from bounded JSON (validate + register or fail-closed) | STOP |
+| Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | STOP |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -48,11 +50,19 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet`: **Kill check** strip shows hit / miss / fail-closed when packet validates
 - Authors set the measured fact when a kill is observed; no fuzzy statement matching
 
-## Advisor answer UI — OPEN (this PR)
+## Advisor answer UI — OPEN (landed)
 
 - `advisor-answer.ts`: `setAdvisorAnswer` + `allowedAnswerRoles` (fail-closed)
 - Replaces same `checkId`; caps `MAX_ADVISOR_ANSWERS`; empty answer rejected
 - Roles: always evaluator / human_open; `agent_propose` only when check `answerAuthority` is `agent_propose`
 - `/packet`: **Advisor answers** strip lists pack checks (bounded); apply updates working packet used by validate / evaluate / open / export
 - `evaluatePacket` + kill gate unchanged; answers marked with selected `answeredAs`
+
+## Durable ledger backend — OPEN (this PR)
+
+- `ledger-durable.ts`: localStorage store (separate key from session); same verify-on-load as session; corrupt → empty
+- APIs: `loadDurableLedger` / `saveDurableLedger` / `clearDurableLedger` / `appendAndPersist` / `loadPreferredLedger`
+- Cap `MAX_SEALS`; never rewrite or delete middle seals; `ledger.ts` stays pure in-memory
+- `/packet`: prefer durable when present (opt-in Persist ledger copies session→durable); session remains ephemeral demo
+- Not durable authority — local opt-in only; humans still own OPEN
 

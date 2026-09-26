@@ -98,6 +98,19 @@ export {
   type SaveLedgerResult,
 } from "./ledger-store.ts";
 
+export {
+  LEDGER_DURABLE_KEY,
+  LEDGER_DURABLE_OPT_IN_KEY,
+  durableLedgerPresent,
+  isDurableOptIn,
+  loadDurableLedger,
+  saveDurableLedger,
+  clearDurableLedger,
+  persistSessionToDurable,
+  appendAndPersist,
+  loadPreferredLedger,
+} from "./ledger-durable.ts";
+
 export { BAKKEN_PACK } from "./packs/bakken.ts";
 export { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
 

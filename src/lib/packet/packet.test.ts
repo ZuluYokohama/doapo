@@ -1326,3 +1326,208 @@ test("evaluatePacket still works after setAdvisorAnswer", () => {
   assert.notEqual(scored.packet.gate, "OPEN_CANDIDATE");
   assert.equal(scored.packet.advisorAnswers.length, 1);
 });
+
+
+import {
+  LEDGER_DURABLE_KEY,
+  LEDGER_DURABLE_OPT_IN_KEY,
+  appendAndPersist,
+  clearDurableLedger,
+  durableLedgerPresent,
+  isDurableOptIn,
+  loadDurableLedger,
+  loadPreferredLedger,
+  persistSessionToDurable,
+  saveDurableLedger,
+} from "./ledger-durable.ts";
+
+type StorageShim = {
+  store: Map<string, string>;
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  key(index: number): string | null;
+  length: number;
+};
+
+function installLocalStorage(): StorageShim {
+  const store = new Map<string, string>();
+  const shim: StorageShim = {
+    store,
+    get length() {
+      return store.size;
+    },
+    getItem(key: string) {
+      return store.has(key) ? (store.get(key) as string) : null;
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    clear() {
+      store.clear();
+    },
+    key(index: number) {
+      const keys = Array.from(store.keys());
+      return index >= 0 && index < keys.length ? keys[index] : null;
+    },
+  };
+  const g = globalThis as Record<string, unknown>;
+  g.window = { localStorage: shim };
+  g.localStorage = shim;
+  return shim;
+}
+
+function uninstallLocalStorage(): void {
+  const g = globalThis as Record<string, unknown>;
+  g.window = undefined;
+  g.localStorage = undefined;
+}
+
+test("durable ledger save/load round-trip and opt-in", () => {
+  const shim = installLocalStorage();
+  try {
+    clearDurableLedger();
+    assert.equal(durableLedgerPresent(), false);
+    assert.equal(isDurableOptIn(), false);
+
+    const g = appendSeal(
+      createLedger(),
+      makeSealInput({ id: "dur-0", prevDigest: "" }),
+    );
+    assert.equal(g.ok, true);
+    if (!g.ok) return;
+    const saved = saveDurableLedger(g.ledger);
+    assert.equal(saved.ok, true);
+    assert.equal(durableLedgerPresent(), true);
+    assert.equal(isDurableOptIn(), true);
+    assert.ok(shim.getItem(LEDGER_DURABLE_KEY) !== null);
+    assert.equal(shim.getItem(LEDGER_DURABLE_OPT_IN_KEY), "1");
+
+    const loaded = loadDurableLedger();
+    assert.equal(loaded.reason, null);
+    assert.equal(loaded.ledger.seals.length, 1);
+    assert.equal(loaded.ledger.seals[0].digest, g.ledger.seals[0].digest);
+  } finally {
+    uninstallLocalStorage();
+  }
+});
+
+test("durable ledger corrupt payload fail-closed to empty", () => {
+  const shim = installLocalStorage();
+  try {
+    shim.setItem(
+      LEDGER_DURABLE_KEY,
+      JSON.stringify({
+        version: LEDGER_STORE_VERSION,
+        seals: [
+          {
+            id: "x",
+            atIso: "2026-09-25T00:00:00.000Z",
+            kind: "propose",
+            packetSubjectId: "s",
+            packId: "bakken",
+            gate: "STOP",
+            proposedBy: "agent_propose",
+            digest: "0".repeat(64),
+            prevDigest: "",
+            note: "bad",
+          },
+        ],
+      }),
+    );
+    const loaded = loadDurableLedger();
+    assert.equal(loaded.ledger.seals.length, 0);
+    assert.ok(loaded.reason !== null);
+    assert.match(String(loaded.reason), /digest|chain/i);
+  } finally {
+    uninstallLocalStorage();
+  }
+});
+
+test("appendAndPersist appends and writes durable", () => {
+  installLocalStorage();
+  try {
+    clearDurableLedger();
+    const first = appendAndPersist(
+      createLedger(),
+      makeSealInput({ id: "ap-0", prevDigest: "" }),
+    );
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    const tip = tipDigest(first.ledger);
+    const second = appendAndPersist(
+      first.ledger,
+      makeSealInput({ id: "ap-1", prevDigest: tip as string }),
+    );
+    assert.equal(second.ok, true);
+    if (!second.ok) return;
+    assert.equal(second.ledger.seals.length, 2);
+    const loaded = loadDurableLedger();
+    assert.equal(loaded.reason, null);
+    assert.equal(loaded.ledger.seals.length, 2);
+  } finally {
+    uninstallLocalStorage();
+  }
+});
+
+test("loadPreferredLedger prefers durable when present", () => {
+  installLocalStorage();
+  try {
+    clearDurableLedger();
+    const sessionOnly = {
+      ledger: createLedger(),
+      reason: null as string | null,
+    };
+    const prefEmpty = loadPreferredLedger(sessionOnly);
+    assert.equal(prefEmpty.source, "session");
+
+    const built = appendSeal(
+      createLedger(),
+      makeSealInput({ id: "pref-0", prevDigest: "" }),
+    );
+    assert.equal(built.ok, true);
+    if (!built.ok) return;
+    const copied = persistSessionToDurable(built.ledger);
+    assert.equal(copied.ok, true);
+
+    const sessionWithOther = {
+      ledger: createLedger(),
+      reason: null as string | null,
+    };
+    const pref = loadPreferredLedger(sessionWithOther);
+    assert.equal(pref.source, "durable");
+    assert.equal(pref.ledger.seals.length, 1);
+
+    clearDurableLedger();
+    const afterClear = loadPreferredLedger(sessionWithOther);
+    assert.equal(afterClear.source, "session");
+  } finally {
+    uninstallLocalStorage();
+  }
+});
+
+test("appendAndPersist rejects broken prevDigest without writing", () => {
+  installLocalStorage();
+  try {
+    clearDurableLedger();
+    const ok = appendAndPersist(
+      createLedger(),
+      makeSealInput({ id: "rej-0", prevDigest: "" }),
+    );
+    assert.equal(ok.ok, true);
+    if (!ok.ok) return;
+    const bad = appendAndPersist(
+      ok.ledger,
+      makeSealInput({ id: "rej-1", prevDigest: "deadbeef".repeat(8) }),
+    );
+    assert.equal(bad.ok, false);
+    const loaded = loadDurableLedger();
+    assert.equal(loaded.ledger.seals.length, 1);
+  } finally {
+    uninstallLocalStorage();
+  }
+});

@@ -28,3 +28,11 @@ No rewrite, delete, or insert-middle APIs.
 ## Related
 
 - `evidence-export.ts` — auditable packet evidence bundle over this ledger (demo freeze artifact).
+
+## Durable store (localStorage)
+
+- `ledger-durable.ts` — opt-in localStorage key separate from session demo store
+- Same versioned payload + `verifySealChain` on load; corrupt → empty
+- `ledger.ts` remains pure in-memory; no middle rewrite/delete
+- Prefer durable when present; session remains ephemeral demo
+
