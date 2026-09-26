@@ -23,8 +23,10 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Outcome cohort summary | Aggregate outcomeClassId counts for a capped search page | **OPEN** (landed) |
 | Kill fact authoring UI | Set measured `kill:id=triggered` facts on `/packet` before audit/open | **OPEN** (landed) |
 | Cohort export JSON | Download fail-closed cohort summary artifact from current search | **OPEN** (landed) |
-| Cohort export import | Parse + verify cohort JSON digest into inspector view | **OPEN** (this PR) |
-| Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **STOP** |
+| Cohort export import | Parse + verify cohort JSON digest into inspector view | **OPEN** (landed) |
+| Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **OPEN** (this PR) |
+| Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **STOP** |
+| Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **STOP** |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -147,10 +149,18 @@ STOP rows are named next candidates only — not committed scope.
 - Cohort strips (wells + `/packet` live): **Export JSON** button beside Summarize
 - Demo artifact — not durable authority; humans still own OPEN
 
-## Cohort export import — OPEN (this PR)
+## Cohort export import — OPEN (landed)
 
 - `cohort-export.ts`: `importOutcomeCohort` (fail-closed)
 - Cap `MAX_COHORT_JSON_CHARS`; guarded `JSON.parse`; schemaVersion check; recompute `bundleDigest` (mismatch → fail)
 - Shape: packId/packVersion, total/unmatched/skipped non-neg ints, byClass ≤ `MAX_OUTCOME_CLASSES`
 - Cohort strips (wells + `/packet` live): paste or file **Import JSON** → inspector table
+- Demo artifact — not durable authority; humans still own OPEN
+
+## Kill scan export JSON — OPEN (this PR)
+
+- `kill-scan-export.ts`: `exportKillScan` + `killScanFilename` (fail-closed)
+- Delegates scan to `scanWellsForKills`; bundle: schemaVersion, packId/packVersion, scanned, hitCount, rows, notes, bundleDigest
+- Download name `kill-scan-<packId>.json` (sanitized, truncated)
+- Kill scan strips (wells + `/packet` live): **Export JSON** button beside Scan
 - Demo artifact — not durable authority; humans still own OPEN

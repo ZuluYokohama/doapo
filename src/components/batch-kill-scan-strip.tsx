@@ -1,10 +1,13 @@
 /**
  * Batch kill scan UI — scan current well search results (capped).
  * Power of 10: bounded render lists, no recursion.
+ * Export JSON downloads a fail-closed freeze artifact (schema + digest).
  */
 import { useState } from "react";
 import {
   MAX_KILL_SCAN_WELLS,
+  exportKillScan,
+  killScanFilename,
   listKillScanHits,
   listPackIds,
   resolvePack,
@@ -13,6 +16,18 @@ import {
   type KillScanRow,
 } from "@/lib/packet";
 import type { WellRow } from "@/lib/outcomes";
+
+function downloadJsonFile(json: string, filename: string): void {
+  console.assert(json.length > 0, "download json present");
+  console.assert(filename.length > 0, "download name present");
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function BatchKillScanStrip({
   wells,
@@ -31,12 +46,14 @@ export function BatchKillScanStrip({
   const [scanned, setScanned] = useState(0);
   const [hitCount, setHitCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   const ids = packIds ?? listPackIds();
   const activePack = pack;
 
   function onScan() {
     setError(null);
+    setExportNote(null);
     if (activePack === null) {
       setError("pack required");
       setRows(null);
@@ -62,9 +79,39 @@ export function BatchKillScanStrip({
     setHitCount(result.hitCount);
   }
 
+  function onExportJson() {
+    setError(null);
+    setExportNote(null);
+    if (activePack === null) {
+      setError("pack required");
+      return;
+    }
+    if (wells.length < 1) {
+      setError("no wells to export");
+      return;
+    }
+    const result = exportKillScan({
+      wells,
+      pack: activePack,
+      maxWells: MAX_KILL_SCAN_WELLS,
+    });
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    downloadJsonFile(result.json, killScanFilename(activePack.id));
+    setRows(result.bundle.rows);
+    setScanned(result.bundle.scanned);
+    setHitCount(result.bundle.hitCount);
+    setExportNote(
+      "exported · digest " + result.bundle.bundleDigest.slice(0, 12) + "…",
+    );
+  }
+
   const hits = rows !== null ? listKillScanHits(rows) : [];
   const showPackSelect =
     onPackId !== undefined && packId !== undefined && ids.length > 0;
+  const canAct = wells.length >= 1 && activePack !== null;
 
   return (
     <section className="mb-4 rounded-md border border-line bg-surface p-4">
@@ -73,7 +120,8 @@ export function BatchKillScanStrip({
       </h2>
       <p className="mt-2 text-sm text-muted">
         Scan up to {MAX_KILL_SCAN_WELLS} current search wells via well→packet→kill
-        (no invented volumes). Reports measured kill hits only.
+        (no invented volumes). Reports measured kill hits only. Export downloads
+        a fail-closed JSON freeze (schemaVersion + digest).
       </p>
 
       {showPackSelect ? (
@@ -97,11 +145,19 @@ export function BatchKillScanStrip({
         <button
           type="button"
           onClick={onScan}
-          disabled={wells.length < 1 || activePack === null}
+          disabled={!canAct}
           className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
         >
           Scan {wells.length < MAX_KILL_SCAN_WELLS ? wells.length : MAX_KILL_SCAN_WELLS}{" "}
           well{wells.length === 1 ? "" : "s"}
+        </button>
+        <button
+          type="button"
+          onClick={onExportJson}
+          disabled={!canAct}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
+        >
+          Export JSON
         </button>
         <span className="font-mono text-xs text-muted">
           {wells.length} in view · cap {MAX_KILL_SCAN_WELLS}
@@ -112,6 +168,10 @@ export function BatchKillScanStrip({
         <p className="mt-3 text-sm text-accent" role="alert">
           fail-closed — {error}
         </p>
+      ) : null}
+
+      {exportNote && error === null ? (
+        <p className="mt-2 font-mono text-xs text-muted">{exportNote}</p>
       ) : null}
 
       {rows !== null && error === null ? (

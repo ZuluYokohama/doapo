@@ -156,3 +156,168 @@ test("listKillScanHits returns only hits bounded", () => {
   assert.equal(hits[0].subjectId, "b");
   assert.equal(hits[1].subjectId, "c");
 });
+
+import { createHash } from "node:crypto";
+import {
+  DEFAULT_KILL_SCAN_EXPORT_NOTES,
+  KILL_SCAN_SCHEMA_VERSION,
+  exportKillScan,
+  killScanFilename,
+} from "./kill-scan-export.ts";
+
+test("exportKillScan happy path with digest", () => {
+  const wells = [
+    sampleWell({ api: "33053000010000", fileNo: 1 }),
+    sampleWell({ api: "33053000020000", fileNo: 2 }),
+  ];
+  const result = exportKillScan({ wells, pack: BAKKEN_PACK });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.schemaVersion, KILL_SCAN_SCHEMA_VERSION);
+  assert.equal(result.bundle.packId, BAKKEN_PACK.id);
+  assert.equal(result.bundle.packVersion, BAKKEN_PACK.version);
+  assert.equal(result.bundle.scanned, 2);
+  assert.equal(result.bundle.hitCount, 0);
+  assert.equal(result.bundle.rows.length, 2);
+  assert.equal(result.bundle.bundleDigest.length, 64);
+  assert.match(result.bundle.notes, /demo kill-scan|not durable/i);
+  assert.ok(result.json.includes(BAKKEN_PACK.id));
+  assert.ok(result.json.includes(result.bundle.bundleDigest));
+});
+
+test("exportKillScan digest matches canonical recompute", () => {
+  const result = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+    notes: "unit-test notes",
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const ordered = {
+    schemaVersion: result.bundle.schemaVersion,
+    exportedAtIso: result.bundle.exportedAtIso,
+    packId: result.bundle.packId,
+    packVersion: result.bundle.packVersion,
+    scanned: result.bundle.scanned,
+    hitCount: result.bundle.hitCount,
+    rows: result.bundle.rows,
+    notes: result.bundle.notes,
+  };
+  const recomputed = createHash("sha256")
+    .update(JSON.stringify(ordered), "utf8")
+    .digest("hex");
+  assert.equal(recomputed, result.bundle.bundleDigest);
+  assert.equal(result.bundle.notes, "unit-test notes");
+});
+
+test("exportKillScan includes hit rows with killId", () => {
+  const pack = packWithStatusKill();
+  const result = exportKillScan({
+    wells: [
+      sampleWell({ status: "triggered", wellName: "KILL WELL", fileNo: 7 }),
+      sampleWell({ api: "33053000010000", fileNo: 1, status: "A" }),
+    ],
+    pack,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.scanned, 2);
+  assert.equal(result.bundle.hitCount, 1);
+  assert.equal(result.bundle.rows[0].hit, true);
+  assert.equal(result.bundle.rows[0].killId, "status");
+  assert.equal(result.bundle.rows[1].hit, false);
+});
+
+test("exportKillScan fail-closed via scan (invalid maxWells)", () => {
+  const result = exportKillScan({
+    wells: [sampleWell()],
+    pack: BAKKEN_PACK,
+    maxWells: 0,
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /maxWells/);
+});
+
+test("exportKillScan fail-closed on missing pack", () => {
+  const result = exportKillScan({
+    wells: [sampleWell()],
+    pack: null as unknown as DomainPack,
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /pack/);
+});
+
+test("exportKillScan fail-closed on missing wells", () => {
+  const result = exportKillScan({
+    wells: null as unknown as WellRow[],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /wells/);
+});
+
+test("exportKillScan empty wells still ok", () => {
+  const result = exportKillScan({
+    wells: [],
+    pack: BAKKEN_PACK,
+    notes: DEFAULT_KILL_SCAN_EXPORT_NOTES,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.scanned, 0);
+  assert.equal(result.bundle.hitCount, 0);
+  assert.equal(result.bundle.rows.length, 0);
+  assert.equal(result.bundle.bundleDigest.length, 64);
+});
+
+test("exportKillScan respects MAX_KILL_SCAN_WELLS via scan", () => {
+  const wells: WellRow[] = [];
+  let i = 0;
+  while (i < MAX_KILL_SCAN_WELLS + 4) {
+    wells.push(
+      sampleWell({
+        api: "33053" + String(20000000 + i).slice(-8),
+        fileNo: 2000 + i,
+        wellName: "E" + String(i),
+      }),
+    );
+    i += 1;
+  }
+  const result = exportKillScan({ wells, pack: BAKKEN_PACK });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.bundle.scanned, MAX_KILL_SCAN_WELLS);
+  assert.equal(result.bundle.rows.length, MAX_KILL_SCAN_WELLS);
+});
+
+test("killScanFilename sanitizes and truncates", () => {
+  assert.equal(killScanFilename("bakken"), "kill-scan-bakken.json");
+  assert.equal(killScanFilename("a/b:c"), "kill-scan-a_b_c.json");
+  assert.equal(killScanFilename(""), "kill-scan-unknown.json");
+  const long = "x".repeat(80);
+  const name = killScanFilename(long);
+  assert.ok(name.startsWith("kill-scan-"));
+  assert.ok(name.endsWith(".json"));
+  assert.ok(name.length < 80);
+});
+
+test("exportKillScan clones rows (mutation safe)", () => {
+  const result = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const before = result.bundle.rows[0].wellLabel;
+  result.bundle.rows[0].wellLabel = before + "-mutated";
+  const again = exportKillScan({
+    wells: [sampleWell({ api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.bundle.rows[0].wellLabel, before);
+});
