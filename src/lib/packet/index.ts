@@ -62,6 +62,16 @@ export {
 } from "./outcome-cohort.ts";
 
 export {
+  COHORT_SCHEMA_VERSION,
+  DEFAULT_COHORT_EXPORT_NOTES,
+  exportOutcomeCohort,
+  cohortFilename,
+  type OutcomeCohortBundle,
+  type ExportOutcomeCohortResult,
+  type ExportOutcomeCohortInput,
+} from "./cohort-export.ts";
+
+export {
   MAX_AUDIT_PACKS,
   auditKillsAcrossPacks,
   auditPacketKills,
