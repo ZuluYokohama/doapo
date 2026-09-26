@@ -266,6 +266,33 @@ export {
 } from "./prioritize.ts";
 
 export {
+  ANALYSIS_SNAPSHOT_SCHEMA,
+  MAX_ANALYSIS_SNAPSHOTS,
+  MAX_SNAPSHOT_STORE_CHARS,
+  ANALYSIS_SNAPSHOT_STORE_KEY,
+  SNAPSHOT_STORE_VERSION,
+  freezePrioritizeSnapshot,
+  freezeCohortSnapshot,
+  citeSnapshotDigest,
+  verifyAnalysisSnapshot,
+  loadAnalysisSnapshots,
+  saveAnalysisSnapshot,
+  clearAnalysisSnapshots,
+  analysisSnapshotsPresent,
+  buildSearchQueryLabel,
+  type AnalysisSnapshotKind,
+  type AnalysisSnapshotPrioritize,
+  type AnalysisSnapshotCohort,
+  type AnalysisSnapshot,
+  type FreezeSnapshotResult,
+  type VerifySnapshotResult,
+  type SaveSnapshotResult,
+  type LoadSnapshotsResult,
+  type FreezePrioritizeSnapshotInput,
+  type FreezeCohortSnapshotInput,
+} from "./analysis-snapshot.ts";
+
+export {
   EVIDENCE_SCHEMA_VERSION,
   EXPORT_SEAL_CAP,
   DEFAULT_EXPORT_NOTES,

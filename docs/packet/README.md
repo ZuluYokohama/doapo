@@ -93,6 +93,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `derive-from-well.ts` | Measured DUC/status derivation → residue + kill hints (status / spud age) |
 | `prioritize.ts` | Operator / DUC prioritization from live search (`prioritizeWells` / `prioritizeOperators`) |
+| `analysis-snapshot.ts` | Durable analysis snapshot freeze + localStorage store (`snapshotDigest`, verify-on-load) |
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence` / `importEvidenceBundle`) |
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
@@ -107,6 +108,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 | `derive-from-well.test.ts` | Derivation rules (confidential-lag, duc-age, stale-duc; no volumes) |
+| `analysis-snapshot.test.ts` | Snapshot freeze / digest / durable store verify-on-load / caps |
 | `kill-scan.test.ts` | Batch kill scan + export/importKillScan digest / bounds / fail-closed |
 | `kill-audit.test.ts` | Cross-pack kill audit + export/importKillAudit digest / bounds / fail-closed |
 
@@ -122,6 +124,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Operator / DUC prioritization
 
 `prioritizeWells` / `prioritizeOperators` rank capped live-search wells by measured status and `daysSinceSpud` (stale DUC first). Operator rollup counts DUC / stale / sealed. UI on wells + `/packet` live beside cohort / kill-scan. **No** new export/import strip. See [NEXT.md](NEXT.md).
+
+## Durable analysis snapshot
+
+`analysis-snapshot.ts` freezes live prioritize / cohort analysis into a digest-keyed durable localStorage store (`pulledAtIso` + pack id/version + optional search label). Verify-on-load; evidence may cite `snapshotDigest`. Persist on prioritize / cohort strips; list strip on wells + `/packet` live. Not an export/import treadmill. See [NEXT.md](NEXT.md).
 
 ## Evidence export / import
 

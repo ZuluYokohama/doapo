@@ -14,9 +14,11 @@ import { searchWells } from "@/lib/ndic.functions";
 import { BatchKillScanStrip, resolveScanPack } from "@/components/batch-kill-scan-strip";
 import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
 import { PrioritizeStrip } from "@/components/prioritize-strip";
+import { AnalysisSnapshotStrip } from "@/components/analysis-snapshot-strip";
 import {
   UI_LEDGER_CAP,
   countSealsForSubject,
+  buildSearchQueryLabel,
   listPackIds,
   listSealsForSubject,
   loadPreferredLedger,
@@ -116,7 +118,14 @@ export function DoapoApp({
   const [selected, setSelected] = useState<WellRow | null>(initial.recent[0] ?? null);
   const [usingRecent, setUsingRecent] = useState(true);
   const [scanPackId, setScanPackId] = useState(() => listPackIds()[0] ?? "bakken");
+  const [snapshotRefresh, setSnapshotRefresh] = useState(0);
   const scanPack = resolveScanPack(scanPackId);
+  const searchQueryLabel = buildSearchQueryLabel({
+    q: filters.q || undefined,
+    county: filters.county || undefined,
+    outcome: filters.outcome || undefined,
+    oilGasOnly: filters.oilGasOnly || undefined,
+  });
 
   useEffect(() => {
     setSnap(initial);
@@ -512,8 +521,16 @@ export function DoapoApp({
               packIds={listPackIds()}
               packId={scanPackId}
               onPackId={setScanPackId}
+              searchQueryLabel={searchQueryLabel}
+              onSnapshotSaved={() => setSnapshotRefresh((n) => n + 1)}
             />
-            <PrioritizeStrip wells={register} />
+            <PrioritizeStrip
+              wells={register}
+              pack={scanPack}
+              searchQueryLabel={searchQueryLabel}
+              onSnapshotSaved={() => setSnapshotRefresh((n) => n + 1)}
+            />
+            <AnalysisSnapshotStrip refreshKey={snapshotRefresh} />
           </div>
 
           {listError ? (

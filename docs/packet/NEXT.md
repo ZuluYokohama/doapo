@@ -28,7 +28,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **OPEN** (landed) |
 | Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **OPEN** (landed) |
 | Measured DUC/status derivation | Derive residue / kill hints from live WellRow (status, spud age); wire into `/packet` live build | **OPEN** (landed) |
-| Operator / DUC prioritization | Rank wells or operators from live search by measured status / DUC age / operator / county | **OPEN** (this PR) |
+| Operator / DUC prioritization | Rank wells or operators from live search by measured status / DUC age / operator / county | **OPEN** (landed) |
+| Durable analysis snapshot | Persist fail-closed freeze of prioritize / cohort keyed by pull time + pack id/version (+ optional search label); localStorage verify-on-load; cite snapshotDigest | **OPEN** (this PR) |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -203,7 +204,7 @@ Named next candidates must **not** invent another export/import artifact strip. 
 
 DOAPO is a **data analysis platform**: NDIC measured substrate → fail-closed measured analysis → durable analytic artifacts (packets, seals, ranked tables). It is **not** a sales-engagement CRM. Product copy must not pitch NexTier / Patterson-UTI / arena marketing. No invented oil/gas/water volumes.
 
-## Operator / DUC prioritization — OPEN (this PR)
+## Operator / DUC prioritization — OPEN (landed)
 
 - `prioritize.ts`: `prioritizeWells` + `prioritizeOperators` + `priorityScore` (fail-closed)
 - Cap `MAX_PRIORITIZE_WELLS` / `MAX_PRIORITIZE_OPERATORS` (64); uses `daysSinceSpud` + `outcomeOf` only
@@ -213,3 +214,15 @@ DOAPO is a **data analysis platform**: NDIC measured substrate → fail-closed m
 - `/packet` live + wells register: **Operator / DUC prioritization** strip beside cohort / kill-scan (Rank; Wells | Operators toggle)
 - **No** new export/import freeze strip for this gate
 - Fail-closed; **no invented volumes**; no NexTier / Patterson marketing in product copy
+
+
+## Durable analysis snapshot — OPEN (this PR)
+
+- `analysis-snapshot.ts`: `freezePrioritizeSnapshot` / `freezeCohortSnapshot` / `verifyAnalysisSnapshot` / `citeSnapshotDigest` (fail-closed)
+- Keyed by `pulledAtIso` + `packId` / `packVersion` + optional `searchQueryLabel`; `snapshotDigest` (SHA-256 canonical)
+- Durable store: localStorage (`ANALYSIS_SNAPSHOT_STORE_KEY`), cap `MAX_ANALYSIS_SNAPSHOTS` (8), verify-on-load (corrupt → empty)
+- APIs: `saveAnalysisSnapshot` / `loadAnalysisSnapshots` / `clearAnalysisSnapshots` / `buildSearchQueryLabel`
+- UI: **Persist snapshot** on prioritize + cohort strips; **Durable analysis snapshots** list (digest citation) on wells + `/packet` live
+- Evidence/export may cite `snapshotDigest:` — **not** a new export/import paste treadmill as primary product
+- Fail-closed; **no invented volumes**; no NexTier / Patterson marketing in product copy
+
