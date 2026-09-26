@@ -11,12 +11,15 @@ import {
 } from "@/lib/packet/fixtures/example-duc-queue-issue";
 import {
   BAKKEN_PACK,
+  DEFAULT_EXPORT_NOTES,
   UI_LEDGER_CAP,
   appendSeal,
   buildPacketFromWell,
   countSealsForSubject,
   createLedger,
   evaluatePacket,
+  evidenceFilename,
+  exportPacketEvidence,
   listPackIds,
   listRecentSeals,
   listSealsForSubject,
@@ -428,6 +431,66 @@ function PacketHistoryStrip({
   );
 }
 
+function downloadJsonFile(json: string, filename: string): void {
+  console.assert(json.length > 0, "download json present");
+  console.assert(filename.length > 0, "download name present");
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function EvidenceExportStrip({
+  packet,
+  ledger,
+  validationOk,
+  onError,
+}: {
+  packet: IssuePacket | null;
+  ledger: SealLedger;
+  validationOk: boolean;
+  onError: (reason: string | null) => void;
+}) {
+  if (!packet || !validationOk) return null;
+  const current = packet;
+  function onExport() {
+    console.assert(current !== null, "export packet present");
+    const result = exportPacketEvidence({
+      packet: current,
+      ledger,
+      notes: DEFAULT_EXPORT_NOTES,
+    });
+    if (!result.ok) {
+      onError(result.reason);
+      return;
+    }
+    onError(null);
+    downloadJsonFile(result.json, evidenceFilename(current.subjectId));
+  }
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Evidence export
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Download a fail-closed freeze artifact: validated packet, subject seals,
+        tip, and chain verify. Demo session ledger — not durable authority;
+        humans still own OPEN.
+      </p>
+      <button
+        type="button"
+        onClick={() => onExport()}
+        className="mt-3 min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+      >
+        Export evidence
+      </button>
+    </section>
+  );
+}
+
 function LiveWellPanel({
   packId,
   onPackId,
@@ -596,6 +659,7 @@ function PacketPage() {
     createLedger(),
   );
   const [storeReason, setStoreReason] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [fixtureRuntimeSteps, setFixtureRuntimeSteps] = useState<
     RuntimeStep[] | null
   >(null);
@@ -964,6 +1028,17 @@ function PacketPage() {
         <PacketHistoryStrip
           ledger={sessionLedger}
           subjectId={historySubjectId}
+        />
+        {exportError ? (
+          <p className="mb-4 text-sm text-accent" role="alert">
+            fail-closed — {exportError}
+          </p>
+        ) : null}
+        <EvidenceExportStrip
+          packet={packet}
+          ledger={sessionLedger}
+          validationOk={validation !== null && validation.ok}
+          onError={setExportError}
         />
         {pageMode === "live" && !packet ? (
           <section className="rounded-md border border-line bg-surface p-4">

@@ -24,3 +24,7 @@ No rewrite, delete, or insert-middle APIs.
 - Tip-chain mismatches and over-capacity fail closed
 - UI can demo seals in component state without persistence
 - Roles remain authority walls; ledger is evidence, not authorization
+
+## Related
+
+- `evidence-export.ts` — auditable packet evidence bundle over this ledger (demo freeze artifact).

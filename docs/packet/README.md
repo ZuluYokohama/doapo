@@ -52,7 +52,7 @@ See `roles.ts` and [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md).
 
 `ledger.ts` backs the `ledger` evidence class with bounded, fail-closed seals (`MAX_SEALS` = 256). Digests chain via `prevDigest` (empty string at genesis). No rewrite, delete, or middle insert. Roles stay pure; UI/demo may call `appendSeal` / `appendOpenSeal` after propose → evaluate → open.
 
-**Subject-scoped history:** `listSealsForSubject` / `countSealsForSubject` filter by `packetSubjectId` (UI-capped). **Session store** (`ledger-store.ts`) persists one demo ledger in `sessionStorage` (versioned JSON, chain verified on load; corrupt → empty). Demo only — not durable authority. See [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
+**Subject-scoped history:** `listSealsForSubject` / `countSealsForSubject` filter by `packetSubjectId` (UI-capped; export may use `EXPORT_SEAL_CAP`). **Session store** (`ledger-store.ts`) persists one demo ledger in `sessionStorage` (versioned JSON, chain verified on load; corrupt → empty). **Evidence export** freezes packet + subject seals into a downloadable JSON bundle. Demo only — not durable authority. See [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
 
 ## Gate verdicts
 
@@ -91,6 +91,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain, subject list) |
 | `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
 | `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
+| `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence`) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 
@@ -98,6 +99,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Live well binding
 
 `from-well.ts` binds a live NDIC `WellRow` into an issue packet: measured facts only (no invented oil/gas/water volumes), `outcomeClassId` from `outcomeOf(status)` when that class is on the pack, residue copied from `pack.residueDefaults`. The `/packet` UI toggles **Fixtures | Live well** and may deep-link with `?mode=live&api=…`. See [NEXT.md](NEXT.md).
+
+## Evidence export
+
+`evidence-export.ts` builds a downloadable freeze artifact: validated packet, subject-scoped seals, ledger tip, full-ledger `chainOk`, and `bundleDigest`. `/packet` offers **Export evidence** when a validated packet is in view. Demo artifact from the session ledger — **not durable authority**; humans still own OPEN. See [NEXT.md](NEXT.md) and [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
 
 ## How to run tests
 
