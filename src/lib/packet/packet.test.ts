@@ -1730,3 +1730,229 @@ test("buildStoreZip round-trip local signature", () => {
   assert.ok(text.includes("a.json"));
   assert.ok(text.includes('{"ok":true}'));
 });
+
+import { createHash } from "node:crypto";
+import {
+  MAX_EVIDENCE_JSON_CHARS,
+  importEvidenceBundle,
+} from "./evidence-export.ts";
+
+function recomputeBundleDigest(fields: {
+  schemaVersion: string;
+  exportedAtIso: string;
+  packId: string;
+  packVersion: string;
+  subjectId: string;
+  packet: unknown;
+  seals: unknown;
+  tipDigest: string | null;
+  chainOk: boolean;
+  notes: string;
+}): string {
+  const ordered = {
+    schemaVersion: fields.schemaVersion,
+    exportedAtIso: fields.exportedAtIso,
+    packId: fields.packId,
+    packVersion: fields.packVersion,
+    subjectId: fields.subjectId,
+    packet: fields.packet,
+    seals: fields.seals,
+    tipDigest: fields.tipDigest,
+    chainOk: fields.chainOk,
+    notes: fields.notes,
+  };
+  return createHash("sha256")
+    .update(JSON.stringify(ordered), "utf8")
+    .digest("hex");
+}
+
+test("importEvidenceBundle round-trip export → import", () => {
+  const packet = exampleHumanOpenCandidate();
+  let ledger = createLedger();
+  const first = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "imp-0",
+      prevDigest: "",
+      packetSubjectId: packet.subjectId,
+      note: "propose",
+    }),
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  ledger = first.ledger;
+  const exported = exportPacketEvidence({ packet, ledger });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  assert.ok(exported.json.length < MAX_EVIDENCE_JSON_CHARS);
+  const imported = importEvidenceBundle(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.packet.subjectId, packet.subjectId);
+  assert.equal(imported.packet.packId, packet.packId);
+  assert.equal(imported.bundle.bundleDigest, exported.bundle.bundleDigest);
+  assert.equal(imported.bundle.seals.length, 1);
+  assert.equal(imported.bundle.seals[0].digest, exported.bundle.seals[0].digest);
+});
+
+test("importEvidenceBundle fail-closed on empty / oversize / bad JSON", () => {
+  const empty = importEvidenceBundle("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.match(empty.reason, /empty/i);
+  const bad = importEvidenceBundle("{not-json");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.reason, /parse/i);
+  const over = importEvidenceBundle("x".repeat(MAX_EVIDENCE_JSON_CHARS + 1));
+  assert.equal(over.ok, false);
+  if (!over.ok) assert.match(over.reason, /size cap/i);
+  const notObj = importEvidenceBundle("[]");
+  assert.equal(notObj.ok, false);
+  if (!notObj.ok) assert.match(notObj.reason, /object/i);
+});
+
+test("importEvidenceBundle fail-closed on schemaVersion mismatch", () => {
+  const packet = exampleHumanOpenCandidate();
+  const exported = exportPacketEvidence({
+    packet,
+    ledger: createLedger(),
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = JSON.parse(exported.json) as Record<string, unknown>;
+  broken.schemaVersion = "doapo-packet-evidence/0";
+  const result = importEvidenceBundle(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /schemaVersion/i);
+});
+
+test("importEvidenceBundle fail-closed on bundleDigest mismatch", () => {
+  const packet = exampleHumanOpenCandidate();
+  const exported = exportPacketEvidence({
+    packet,
+    ledger: createLedger(),
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = JSON.parse(exported.json) as Record<string, unknown>;
+  broken.notes = "tampered notes";
+  const result = importEvidenceBundle(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /bundleDigest/i);
+});
+
+test("importEvidenceBundle fail-closed on unknown pack (digest-aligned)", () => {
+  const packet = exampleHumanOpenCandidate();
+  const exported = exportPacketEvidence({
+    packet,
+    ledger: createLedger(),
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = JSON.parse(exported.json) as {
+    schemaVersion: string;
+    exportedAtIso: string;
+    packId: string;
+    packVersion: string;
+    subjectId: string;
+    packet: IssuePacket;
+    seals: unknown[];
+    tipDigest: string | null;
+    chainOk: boolean;
+    notes: string;
+    bundleDigest: string;
+  };
+  broken.packId = "no-such-pack";
+  broken.packet = { ...broken.packet, packId: "no-such-pack" };
+  broken.bundleDigest = recomputeBundleDigest(broken);
+  const result = importEvidenceBundle(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /unknown pack/i);
+});
+
+test("importEvidenceBundle fail-closed on seal digest mismatch", () => {
+  const packet = exampleHumanOpenCandidate();
+  let ledger = createLedger();
+  const first = appendSeal(
+    ledger,
+    makeSealInput({
+      id: "seal-bad-0",
+      prevDigest: "",
+      packetSubjectId: packet.subjectId,
+    }),
+  );
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  ledger = first.ledger;
+  const exported = exportPacketEvidence({ packet, ledger });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = JSON.parse(exported.json) as {
+    schemaVersion: string;
+    exportedAtIso: string;
+    packId: string;
+    packVersion: string;
+    subjectId: string;
+    packet: IssuePacket;
+    seals: Array<{ digest: string; [key: string]: unknown }>;
+    tipDigest: string | null;
+    chainOk: boolean;
+    notes: string;
+    bundleDigest: string;
+  };
+  assert.ok(broken.seals.length >= 1);
+  broken.seals[0] = { ...broken.seals[0], digest: "a".repeat(64) };
+  broken.bundleDigest = recomputeBundleDigest(broken);
+  const result = importEvidenceBundle(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /seal digest/i);
+});
+
+test("importEvidenceBundle empty seals still ok", () => {
+  const packet = exampleHumanOpenCandidate();
+  const exported = exportPacketEvidence({
+    packet,
+    ledger: createLedger(),
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  assert.equal(exported.bundle.seals.length, 0);
+  const imported = importEvidenceBundle(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.bundle.seals.length, 0);
+  assert.equal(imported.packet.subjectId, packet.subjectId);
+});
+
+test("importEvidenceBundle prefers resolvePack overlay", () => {
+  const base = exampleHumanOpenCandidate();
+  const overlayPack = { ...BAKKEN_PACK, id: "session-overlay-pack", title: "Overlay" };
+  // Export bakken, retarget pack ids + recompute digest, import with overlay.
+  const exported = exportPacketEvidence({
+    packet: base,
+    ledger: createLedger(),
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const retarget = JSON.parse(exported.json) as {
+    schemaVersion: string;
+    exportedAtIso: string;
+    packId: string;
+    packVersion: string;
+    subjectId: string;
+    packet: IssuePacket;
+    seals: unknown[];
+    tipDigest: string | null;
+    chainOk: boolean;
+    notes: string;
+    bundleDigest: string;
+  };
+  retarget.packId = overlayPack.id;
+  retarget.packet = { ...retarget.packet, packId: overlayPack.id };
+  retarget.bundleDigest = recomputeBundleDigest(retarget);
+  const miss = importEvidenceBundle(JSON.stringify(retarget), null);
+  assert.equal(miss.ok, false);
+  const hit = importEvidenceBundle(JSON.stringify(retarget), overlayPack);
+  assert.equal(hit.ok, true);
+  if (!hit.ok) return;
+  assert.equal(hit.packet.packId, "session-overlay-pack");
+});

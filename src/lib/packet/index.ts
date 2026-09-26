@@ -146,11 +146,16 @@ export {
   EVIDENCE_SCHEMA_VERSION,
   EXPORT_SEAL_CAP,
   DEFAULT_EXPORT_NOTES,
+  MAX_EVIDENCE_JSON_CHARS,
   exportPacketEvidence,
+  importEvidenceBundle,
   evidenceFilename,
   type PacketEvidenceBundle,
   type ExportEvidenceResult,
   type ExportEvidenceInput,
+  type ImportEvidenceResult,
+  type ImportEvidenceOk,
+  type ImportEvidenceErr,
 } from "./evidence-export.ts";
 
 export {
