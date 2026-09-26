@@ -1531,3 +1531,81 @@ test("appendAndPersist rejects broken prevDigest without writing", () => {
     uninstallLocalStorage();
   }
 });
+
+import {
+  MAX_PACK_JSON_CHARS,
+  importPackFromJson,
+  resolvePack,
+} from "./pack-import.ts";
+
+test("importPackFromJson accepts bakken JSON round-trip", () => {
+  const json = JSON.stringify(BAKKEN_PACK);
+  assert.ok(json.length < MAX_PACK_JSON_CHARS);
+  const result = importPackFromJson(json);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.pack.id, BAKKEN_PACK.id);
+  assert.equal(result.pack.schemaVersion, PACKET_SCHEMA_VERSION);
+  assert.equal(result.pack.outcomeClasses.length, BAKKEN_PACK.outcomeClasses.length);
+  assert.equal(validateDomainPack(result.pack).ok, true);
+});
+
+test("importPackFromJson fail-closed on empty / oversize / bad JSON", () => {
+  const empty = importPackFromJson("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.match(empty.reason, /empty/);
+
+  const bad = importPackFromJson("{not-json");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.reason, /parse/i);
+
+  const over = importPackFromJson("x".repeat(MAX_PACK_JSON_CHARS + 1));
+  assert.equal(over.ok, false);
+  if (!over.ok) assert.match(over.reason, /size cap/);
+
+  const notObj = importPackFromJson("[]");
+  assert.equal(notObj.ok, false);
+  if (!notObj.ok) assert.match(notObj.reason, /object/);
+});
+
+test("importPackFromJson fail-closed on schema mismatch", () => {
+  const broken = {
+    ...BAKKEN_PACK,
+    schemaVersion: "0.0.0",
+  };
+  const result = importPackFromJson(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /schemaVersion/);
+});
+
+test("importPackFromJson fail-closed when killConditions missing", () => {
+  const { killConditions: _k, ...rest } = BAKKEN_PACK;
+  const result = importPackFromJson(JSON.stringify(rest));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /killConditions/);
+});
+
+test("resolvePack prefers session overlay without mutating registry", () => {
+  const json = JSON.stringify({
+    ...DUC_QUEUE_PACK,
+    id: "session-overlay-pack",
+    title: "Session overlay pack",
+  });
+  const imported = importPackFromJson(json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+
+  const hit = resolvePack("session-overlay-pack", imported.pack);
+  assert.equal(hit.ok, true);
+  if (hit.ok) assert.equal(hit.pack.title, "Session overlay pack");
+
+  const miss = resolvePack("session-overlay-pack", null);
+  assert.equal(miss.ok, false);
+
+  assert.equal(getPack("session-overlay-pack"), null);
+  assert.equal(listPackIds().includes("session-overlay-pack"), false);
+
+  const bakken = resolvePack("bakken", imported.pack);
+  assert.equal(bakken.ok, true);
+  if (bakken.ok) assert.equal(bakken.pack.id, "bakken");
+});

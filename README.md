@@ -29,6 +29,8 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **UI packet inspector:** read-only `/packet` route (fixtures; no NDIC loader)
 - **Kill-condition runtime:** measured fact `kill.id` / `kill:<id>=triggered` forces STOP via `evaluatePacket`
 - **Advisor answer UI:** `/packet` fills `advisorChecks` into the working packet before open
+- **Durable ledger:** opt-in localStorage persistence (prefer when present; still not durable authority)
+- **Pack import JSON:** paste/file load on `/packet`; validate + session overlay (static registry unchanged)
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 

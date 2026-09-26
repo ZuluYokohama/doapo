@@ -13,8 +13,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Auditable packet export | Downloadable evidence bundle: packet + subject seals + tip + chain verify | **OPEN** (landed) |
 | Kill-condition runtime check | Evaluate pack killConditions against packet measured facts / answers → forced STOP | **OPEN** (landed) |
 | Advisor answer UI | Human/evaluator fill advisorChecks on `/packet` before open | **OPEN** (landed) |
-| Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | **OPEN** (this PR) |
-| Pack import JSON | Import a domain pack from bounded JSON (validate + register or fail-closed) | STOP |
+| Durable ledger backend | Persist seals beyond sessionStorage (opt-in; still append-only) | **OPEN** (landed) |
+| Pack import JSON | Import a domain pack from bounded JSON (validate + session overlay; static registry unchanged) | **OPEN** (this PR) |
 | Multi-subject export zip | Bundle evidence JSON for several subjects into one download archive | STOP |
 
 STOP rows are named next candidates only — not committed scope.
@@ -58,11 +58,19 @@ STOP rows are named next candidates only — not committed scope.
 - `/packet`: **Advisor answers** strip lists pack checks (bounded); apply updates working packet used by validate / evaluate / open / export
 - `evaluatePacket` + kill gate unchanged; answers marked with selected `answeredAs`
 
-## Durable ledger backend — OPEN (this PR)
+## Durable ledger backend — OPEN (landed)
 
 - `ledger-durable.ts`: localStorage store (separate key from session); same verify-on-load as session; corrupt → empty
 - APIs: `loadDurableLedger` / `saveDurableLedger` / `clearDurableLedger` / `appendAndPersist` / `loadPreferredLedger`
 - Cap `MAX_SEALS`; never rewrite or delete middle seals; `ledger.ts` stays pure in-memory
 - `/packet`: prefer durable when present (opt-in Persist ledger copies session→durable); session remains ephemeral demo
 - Not durable authority — local opt-in only; humans still own OPEN
+
+## Pack import JSON — OPEN (this PR)
+
+- `pack-import.ts`: `importPackFromJson` + `resolvePack` (fail-closed)
+- Cap `MAX_PACK_JSON_CHARS`; guarded `JSON.parse`; `validateDomainPack` required
+- Static registry is **not** mutated — imported pack is session/UI overlay only
+- `/packet`: paste or file load; select imported id for live well build / kill / advisor
+- Multi-subject export zip remains STOP
 
