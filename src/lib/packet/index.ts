@@ -56,11 +56,16 @@ export {
 export {
   KILL_SCAN_SCHEMA_VERSION,
   DEFAULT_KILL_SCAN_EXPORT_NOTES,
+  MAX_KILL_SCAN_JSON_CHARS,
   exportKillScan,
+  importKillScan,
   killScanFilename,
   type KillScanBundle,
   type ExportKillScanResult,
   type ExportKillScanInput,
+  type ImportKillScanResult,
+  type ImportKillScanOk,
+  type ImportKillScanErr,
 } from "./kill-scan-export.ts";
 
 export {
