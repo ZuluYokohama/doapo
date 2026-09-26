@@ -174,7 +174,7 @@ test("duc-queue pack validates", () => {
   assert.equal(result.ok, true);
   assert.equal(DUC_QUEUE_PACK.id, "bakken-duc");
   assert.equal(DUC_QUEUE_PACK.schemaVersion, PACKET_SCHEMA_VERSION);
-  assert.equal(DUC_QUEUE_PACK.version, "1.1.1");
+  assert.equal(DUC_QUEUE_PACK.version, "1.2.0");
   assert.ok(DUC_QUEUE_PACK.outcomeClasses.length >= 1);
   assert.ok(DUC_QUEUE_PACK.killConditions.length >= 1);
 });

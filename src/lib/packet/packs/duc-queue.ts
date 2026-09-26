@@ -49,7 +49,7 @@ function outcomeClassesForQueue(): OutcomeClass[] {
 export const DUC_QUEUE_PACK: DomainPack = {
   schemaVersion: PACKET_SCHEMA_VERSION,
   id: "bakken-duc",
-  version: "1.1.1",
+  version: "1.2.0",
   title: "Bakken DUC queue — NDIC measured statuses only",
   substrate:
     "Same NDIC public GIS well index as pack bakken; resolution lens is DUC / NC / completion-readiness statuses only (no invented codes).",
@@ -116,6 +116,20 @@ export const DUC_QUEUE_PACK: DomainPack = {
         "This pack shares the NDIC public GIS substrate with pack bakken. It does not invent a second data source. The difference is resolution lens: DUC / NC / completion-readiness classes, not full Bakken lifecycle outcomes.",
       evidence: "measured",
     },
+    // Conditional: included by derive-from-well when NC + days-since-spud ≥ threshold.
+    {
+      id: "duc-age",
+      statement:
+        "NDIC status NC with measured days-since-spud at or past the pack DUC age threshold — timing residue only; no inventable volumes.",
+      evidence: "derived",
+    },
+    // Conditional template: confidential / sealed status lag (same rule as bakken).
+    {
+      id: "confidential-lag",
+      statement:
+        "Confidential wells may withhold completion and production detail for a statutory period.",
+      evidence: "measured",
+    },
   ],
   killConditions: [
     {
@@ -136,6 +150,11 @@ export const DUC_QUEUE_PACK: DomainPack = {
       id: "external-doc-as-sop",
       statement:
         "STOP if an external public page is treated as binding SOP or setpoints.",
+    },
+    {
+      id: "stale-duc",
+      statement:
+        "STOP if measured NC days-since-spud meets or exceeds the pack stale-DUC threshold without human completion authority.",
     },
   ],
   publicSources: [
