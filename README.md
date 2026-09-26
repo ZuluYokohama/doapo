@@ -33,6 +33,7 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **Pack import JSON:** paste/file load on `/packet`; validate + session overlay (static registry unchanged)
 - **Multi-subject export zip:** `/packet` bundles evidence JSON for ≤16 subjects into one STORE zip + fail-closed manifest
 - **Evidence bundle import:** paste/file load on `/packet`; verify digest + pack + packet; loads working state
+- **Residue editor UI:** edit / add / remove residue on `/packet` before open (bounded, fail-closed)
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 
