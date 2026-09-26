@@ -54,6 +54,16 @@ export {
 } from "./kill-scan.ts";
 
 export {
+  KILL_SCAN_SCHEMA_VERSION,
+  DEFAULT_KILL_SCAN_EXPORT_NOTES,
+  exportKillScan,
+  killScanFilename,
+  type KillScanBundle,
+  type ExportKillScanResult,
+  type ExportKillScanInput,
+} from "./kill-scan-export.ts";
+
+export {
   MAX_COHORT_WELLS,
   summarizeOutcomeCohort,
   type CohortClassCount,
