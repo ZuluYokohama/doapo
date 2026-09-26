@@ -1,17 +1,32 @@
 /**
  * Cross-pack kill audit UI — one packet vs registered packs (+ overlay).
  * Power of 10: bounded render lists, no recursion.
+ * Export JSON downloads a fail-closed freeze artifact (schema + digest).
  */
 import { useState } from "react";
 import {
   MAX_AUDIT_PACKS,
   auditKillsAcrossPacks,
+  exportKillAudit,
+  killAuditFilename,
   listKillAuditHits,
   listPacksForAudit,
   type DomainPack,
   type IssuePacket,
   type KillAuditRow,
 } from "@/lib/packet";
+
+function downloadJsonFile(json: string, filename: string): void {
+  console.assert(json.length > 0, "download json present");
+  console.assert(filename.length > 0, "download name present");
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function CrossPackKillAuditStrip({
   packet,
@@ -26,6 +41,7 @@ export function CrossPackKillAuditStrip({
   const [audited, setAudited] = useState(0);
   const [hitCount, setHitCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   if (!packet || !validationOk) {
     return null;
@@ -34,6 +50,7 @@ export function CrossPackKillAuditStrip({
 
   function onAudit() {
     setError(null);
+    setExportNote(null);
     console.assert(current !== null, "audit packet present");
     const packs = listPacksForAudit(overlayPack);
     const result = auditKillsAcrossPacks({
@@ -52,6 +69,30 @@ export function CrossPackKillAuditStrip({
     setHitCount(result.hitCount);
   }
 
+  function onExportJson() {
+    setError(null);
+    setExportNote(null);
+    console.assert(current !== null, "export packet present");
+    const packs = listPacksForAudit(overlayPack);
+    const result = exportKillAudit({
+      packet: current,
+      packs,
+      overlay: overlayPack,
+      maxPacks: MAX_AUDIT_PACKS,
+    });
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    downloadJsonFile(result.json, killAuditFilename(current.subjectId));
+    setRows(result.bundle.rows);
+    setAudited(result.bundle.audited);
+    setHitCount(result.bundle.hitCount);
+    setExportNote(
+      "exported · digest " + result.bundle.bundleDigest.slice(0, 12) + "…",
+    );
+  }
+
   const hits = rows !== null ? listKillAuditHits(rows) : [];
   const showAll = rows !== null && error === null;
 
@@ -64,7 +105,8 @@ export function CrossPackKillAuditStrip({
         Run checkKillConditions for this packet against every registered pack
         (cap {MAX_AUDIT_PACKS}
         {overlayPack ? "; session overlay included" : ""}). Same measured facts;
-        pack kill id namespaces may differ.
+        pack kill id namespaces may differ. Export downloads a fail-closed JSON
+        freeze (schemaVersion + digest).
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -75,6 +117,13 @@ export function CrossPackKillAuditStrip({
         >
           Audit packs
         </button>
+        <button
+          type="button"
+          onClick={onExportJson}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg"
+        >
+          Export JSON
+        </button>
         <span className="font-mono text-xs text-muted">
           subject {current.subjectId} · pack {current.packId}
         </span>
@@ -84,6 +133,10 @@ export function CrossPackKillAuditStrip({
         <p className="mt-3 text-sm text-accent" role="alert">
           fail-closed — {error}
         </p>
+      ) : null}
+
+      {exportNote && error === null ? (
+        <p className="mt-2 font-mono text-xs text-muted">{exportNote}</p>
       ) : null}
 
       {showAll ? (

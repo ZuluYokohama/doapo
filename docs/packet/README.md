@@ -96,6 +96,8 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
 | `kill-scan.ts` | Batch `scanWellsForKills` (≤`MAX_KILL_SCAN_WELLS`) via well→packet→kill |
 | `kill-scan-export.ts` | `exportKillScan` / `importKillScan` freeze artifact (schemaVersion + bundleDigest) |
+| `kill-audit.ts` | Cross-pack `auditKillsAcrossPacks` (≤`MAX_AUDIT_PACKS`) packet vs packs + overlay |
+| `kill-audit-export.ts` | `exportKillAudit` / `importKillAudit` freeze artifact (schemaVersion + bundleDigest) |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
 | `residue-edit.ts` | `setResidueItem` / `addResidueItem` / `removeResidueItem` (edit before open) |
 | `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
@@ -103,6 +105,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 | `kill-scan.test.ts` | Batch kill scan + export/importKillScan digest / bounds / fail-closed |
+| `kill-audit.test.ts` | Cross-pack kill audit + export/importKillAudit digest / bounds / fail-closed |
 
 
 ## Live well binding
@@ -120,6 +123,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Batch well kill scan
 
 `kill-scan.ts` scans a bounded list of NDIC wells (`MAX_KILL_SCAN_WELLS` = 64) through `buildPacketFromWell` then `checkKillConditions`. No invented volumes. `kill-scan-export.ts` freezes the scan into a downloadable JSON artifact (`schemaVersion` + `bundleDigest`) and `importKillScan` verifies the same fail-closed. `/packet` live mode and the wells register offer **Batch kill scan** + **Export JSON** + paste/file **Import JSON** over current search results and a hit table. See [NEXT.md](NEXT.md).
+
+## Cross-pack kill audit
+
+`kill-audit.ts` audits one validated packet against every registered pack (+ optional session overlay), capped at `MAX_AUDIT_PACKS`. `kill-audit-export.ts` freezes the hit table into a downloadable JSON artifact (`schemaVersion` + `bundleDigest`); `importKillAudit` verifies the same fail-closed. `/packet` offers **Cross-pack kill audit** + **Export JSON**. See [NEXT.md](NEXT.md).
 
 ## Advisor answer UI
 
@@ -140,7 +147,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## How to run tests
 
 ```bash
-./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts src/lib/packet/kill-scan.test.ts
+./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts src/lib/packet/kill-scan.test.ts src/lib/packet/kill-audit.test.ts
 ```
 
 See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [DUC-QUEUE.md](DUC-QUEUE.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).

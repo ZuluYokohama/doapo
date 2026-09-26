@@ -25,8 +25,8 @@ Each item is **STOP until OPEN** (human `OPEN_CANDIDATE`). Do not treat this lis
 | Cohort export JSON | Download fail-closed cohort summary artifact from current search | **OPEN** (landed) |
 | Cohort export import | Parse + verify cohort JSON digest into inspector view | **OPEN** (landed) |
 | Kill scan export JSON | Download fail-closed batch kill-scan artifact (schema + digest) | **OPEN** (landed) |
-| Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **OPEN** (this PR) |
-| Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **STOP** |
+| Kill scan export import | Parse + verify kill-scan JSON digest into inspector view | **OPEN** (landed) |
+| Cross-pack kill audit export JSON | Download fail-closed cross-pack audit artifact (schema + digest) | **OPEN** (this PR) |
 
 STOP rows are named next candidates only — not committed scope.
 
@@ -165,7 +165,7 @@ STOP rows are named next candidates only — not committed scope.
 - Kill scan strips (wells + `/packet` live): **Export JSON** button beside Scan
 - Demo artifact — not durable authority; humans still own OPEN
 
-## Kill scan export import — OPEN (this PR)
+## Kill scan export import — OPEN (landed)
 
 - `kill-scan-export.ts`: `importKillScan` (fail-closed)
 - Cap `MAX_KILL_SCAN_JSON_CHARS`; guarded `JSON.parse`; schemaVersion check; recompute `bundleDigest` (mismatch → fail)
@@ -173,3 +173,11 @@ STOP rows are named next candidates only — not committed scope.
 - Kill scan strips (wells + `/packet` live): paste or file **Import JSON** → inspector table
 - Demo artifact — not durable authority; humans still own OPEN
 
+## Cross-pack kill audit export JSON — OPEN (this PR)
+
+- `kill-audit-export.ts`: `exportKillAudit` + `killAuditFilename` + `importKillAudit` (fail-closed)
+- Delegates audit to `auditKillsAcrossPacks`; bundle: schemaVersion, subjectId, packetPackId, audited, hitCount, rows, notes, bundleDigest
+- Download name `kill-audit-<subjectId>.json` (sanitized, truncated)
+- `/packet` cross-pack kill audit strip: **Export JSON** button beside Audit packs
+- `importKillAudit` verifies schemaVersion + recomputed digest (for any future import UI); no invented volumes
+- Demo artifact — not durable authority; humans still own OPEN
