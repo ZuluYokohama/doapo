@@ -11,9 +11,11 @@ import {
 } from "recharts";
 import { RefreshCw, Search } from "lucide-react";
 import { searchWells } from "@/lib/ndic.functions";
+import { BatchKillScanStrip, resolveScanPack } from "@/components/batch-kill-scan-strip";
 import {
   UI_LEDGER_CAP,
   countSealsForSubject,
+  listPackIds,
   listSealsForSubject,
   loadPreferredLedger,
   loadSessionLedger,
@@ -111,6 +113,8 @@ export function DoapoApp({
   const [listError, setListError] = useState<string | null>(null);
   const [selected, setSelected] = useState<WellRow | null>(initial.recent[0] ?? null);
   const [usingRecent, setUsingRecent] = useState(true);
+  const [scanPackId, setScanPackId] = useState(() => listPackIds()[0] ?? "bakken");
+  const scanPack = resolveScanPack(scanPackId);
 
   useEffect(() => {
     setSnap(initial);
@@ -490,6 +494,16 @@ export function DoapoApp({
                 Clear
               </button>
             ) : null}
+          </div>
+
+          <div className="mt-4">
+            <BatchKillScanStrip
+              wells={register}
+              pack={scanPack}
+              packIds={listPackIds()}
+              packId={scanPackId}
+              onPackId={setScanPackId}
+            />
           </div>
 
           {listError ? (

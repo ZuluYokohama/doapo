@@ -94,12 +94,14 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `evidence-export.ts` | Fail-closed auditable evidence bundle (`exportPacketEvidence` / `importEvidenceBundle`) |
 | `evidence-zip.ts` | Multi-subject STORE zip (`exportMultiSubjectEvidenceZip`, `MAX_EXPORT_SUBJECTS`) |
 | `kill-check.ts` | Runtime killConditions check + `applyKillGate` (forced STOP) |
+| `kill-scan.ts` | Batch `scanWellsForKills` (≤`MAX_KILL_SCAN_WELLS`) via well→packet→kill |
 | `advisor-answer.ts` | `setAdvisorAnswer` / `allowedAnswerRoles` (fill checks before open) |
 | `residue-edit.ts` | `setResidueItem` / `addResidueItem` / `removeResidueItem` (edit before open) |
 | `pack-import.ts` | `importPackFromJson` / `resolvePack` (bounded JSON; session overlay) |
 | `ledger-durable.ts` | Opt-in localStorage durable ledger (prefer when present) |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
+| `kill-scan.test.ts` | Batch kill scan bounds / hit / miss / fail-closed |
 
 
 ## Live well binding
@@ -113,6 +115,10 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## Kill-condition runtime
 
 `kill-check.ts` evaluates pack `killConditions` against packet measured facts. A kill hits when a fact key equals `kill.id` or `kill:<id>` with value `triggered`. `evaluatePacket` applies `applyKillGate` last so a triggered kill forces STOP / FAIL. See [NEXT.md](NEXT.md).
+
+## Batch well kill scan
+
+`kill-scan.ts` scans a bounded list of NDIC wells (`MAX_KILL_SCAN_WELLS` = 64) through `buildPacketFromWell` then `checkKillConditions`. No invented volumes. `/packet` live mode and the wells register offer a **Batch kill scan** button over current search results and a hit table. See [NEXT.md](NEXT.md).
 
 ## Advisor answer UI
 
@@ -133,7 +139,7 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 ## How to run tests
 
 ```bash
-./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts
+./node_modules/.bin/tsx --test src/lib/packet/packet.test.ts src/lib/packet/from-well.test.ts src/lib/packet/kill-scan.test.ts
 ```
 
 See also [AUTHORING.md](AUTHORING.md), [BAKKEN.md](BAKKEN.md), [DUC-QUEUE.md](DUC-QUEUE.md), [ADR-001-packet-schema.md](ADR-001-packet-schema.md), [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md), [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md), [NEXT.md](NEXT.md).
