@@ -185,8 +185,10 @@ test("summarizeOutcomeCohort empty wells yields zero totals", () => {
 import {
   COHORT_SCHEMA_VERSION,
   DEFAULT_COHORT_EXPORT_NOTES,
+  MAX_COHORT_JSON_CHARS,
   cohortFilename,
   exportOutcomeCohort,
+  importOutcomeCohort,
 } from "./cohort-export.ts";
 import { createHash } from "node:crypto";
 
@@ -320,4 +322,135 @@ test("cohortFilename sanitizes and truncates", () => {
   assert.ok(name.startsWith("outcome-cohort-"));
   assert.ok(name.endsWith(".json"));
   assert.ok(name.length < 80);
+});
+
+test("importOutcomeCohort round-trip export → import", () => {
+  const wells = [
+    sampleWell({ status: "NC", api: "33053000010000", fileNo: 1 }),
+    sampleWell({ status: "A", api: "33053000020000", fileNo: 2 }),
+  ];
+  const exported = exportOutcomeCohort({ wells, pack: BAKKEN_PACK });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  assert.ok(exported.json.length < MAX_COHORT_JSON_CHARS);
+  const imported = importOutcomeCohort(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  assert.equal(imported.bundle.schemaVersion, COHORT_SCHEMA_VERSION);
+  assert.equal(imported.bundle.packId, BAKKEN_PACK.id);
+  assert.equal(imported.bundle.packVersion, BAKKEN_PACK.version);
+  assert.equal(imported.bundle.total, 2);
+  assert.equal(imported.bundle.bundleDigest, exported.bundle.bundleDigest);
+  assert.equal(countFor(imported.bundle.byClass, "duc"), 1);
+  assert.equal(countFor(imported.bundle.byClass, "producing"), 1);
+  assert.equal(imported.bundle.byClass.length, exported.bundle.byClass.length);
+});
+
+test("importOutcomeCohort fail-closed on empty / oversize / bad JSON", () => {
+  const empty = importOutcomeCohort("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.match(empty.reason, /empty/);
+  const bad = importOutcomeCohort("{not-json");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.reason, /parse/i);
+  const over = importOutcomeCohort("x".repeat(MAX_COHORT_JSON_CHARS + 1));
+  assert.equal(over.ok, false);
+  if (!over.ok) assert.match(over.reason, /size cap/);
+  const notObj = importOutcomeCohort("[]");
+  assert.equal(notObj.ok, false);
+  if (!notObj.ok) assert.match(notObj.reason, /object/);
+});
+
+test("importOutcomeCohort fail-closed on schemaVersion mismatch", () => {
+  const exported = exportOutcomeCohort({
+    wells: [sampleWell({ status: "A", api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = { ...exported.bundle, schemaVersion: "wrong/1" };
+  const result = importOutcomeCohort(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /schemaVersion/);
+});
+
+test("importOutcomeCohort fail-closed on bundleDigest mismatch", () => {
+  const exported = exportOutcomeCohort({
+    wells: [sampleWell({ status: "A", api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = {
+    ...exported.bundle,
+    total: exported.bundle.total + 1,
+  };
+  const result = importOutcomeCohort(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /bundleDigest/);
+});
+
+test("importOutcomeCohort fail-closed on tampered digest hex", () => {
+  const exported = exportOutcomeCohort({
+    wells: [sampleWell({ status: "A", api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const badHex = "0".repeat(64);
+  assert.notEqual(badHex, exported.bundle.bundleDigest);
+  const broken = { ...exported.bundle, bundleDigest: badHex };
+  const result = importOutcomeCohort(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /bundleDigest/);
+});
+
+test("importOutcomeCohort fail-closed on missing packId", () => {
+  const exported = exportOutcomeCohort({
+    wells: [],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const broken = { ...exported.bundle, packId: "" };
+  const result = importOutcomeCohort(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /packId/);
+});
+
+test("importOutcomeCohort fail-closed on byClass over cap", () => {
+  const exported = exportOutcomeCohort({
+    wells: [],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const rows = [];
+  let i = 0;
+  while (i < 40) {
+    rows.push({ id: "c" + String(i), label: "L" + String(i), count: 0 });
+    i += 1;
+  }
+  const broken = { ...exported.bundle, byClass: rows };
+  const result = importOutcomeCohort(JSON.stringify(broken));
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /byClass|MAX_OUTCOME/);
+});
+
+test("importOutcomeCohort clones byClass (mutation safe)", () => {
+  const exported = exportOutcomeCohort({
+    wells: [sampleWell({ status: "A", api: "33053000010000", fileNo: 1 })],
+    pack: BAKKEN_PACK,
+  });
+  assert.equal(exported.ok, true);
+  if (!exported.ok) return;
+  const imported = importOutcomeCohort(exported.json);
+  assert.equal(imported.ok, true);
+  if (!imported.ok) return;
+  const before = imported.bundle.byClass[0].count;
+  imported.bundle.byClass[0].count = before + 99;
+  const again = importOutcomeCohort(exported.json);
+  assert.equal(again.ok, true);
+  if (!again.ok) return;
+  assert.equal(again.bundle.byClass[0].count, before);
 });

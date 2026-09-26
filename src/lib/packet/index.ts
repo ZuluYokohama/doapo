@@ -64,11 +64,16 @@ export {
 export {
   COHORT_SCHEMA_VERSION,
   DEFAULT_COHORT_EXPORT_NOTES,
+  MAX_COHORT_JSON_CHARS,
   exportOutcomeCohort,
+  importOutcomeCohort,
   cohortFilename,
   type OutcomeCohortBundle,
   type ExportOutcomeCohortResult,
   type ExportOutcomeCohortInput,
+  type ImportOutcomeCohortResult,
+  type ImportOutcomeCohortOk,
+  type ImportOutcomeCohortErr,
 } from "./cohort-export.ts";
 
 export {
