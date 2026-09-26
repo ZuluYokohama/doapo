@@ -38,13 +38,14 @@ The multi-domain packet schema lives under `src/lib/packet/`.
 - **Cross-pack kill audit:** one validated packet vs every registered pack (+ overlay); hit table on `/packet`
 - **Outcome cohort summary:** capped well→packet→outcomeClassId counts; cohort table on `/packet` live + wells
 - **Kill fact authoring:** toggle pack killConditions → measured `kill:<id>=triggered` on `/packet` working packet
+- **Operator / DUC prioritization:** rank live search wells / operators by measured status + DUC age
+- **Durable analysis snapshot:** persist prioritize / cohort freeze (pack + pull time + digest) in localStorage
 - **Cohort export JSON:** download fail-closed cohort summary (schemaVersion + digest) from wells + `/packet` live strips
 - **Cohort export import:** paste/file load on cohort strips; verify schemaVersion + digest into inspector view
 - **Kill scan export JSON:** download fail-closed batch kill-scan artifact (schemaVersion + digest) from wells + `/packet` live strips
 - **Kill scan export import:** paste/file load on kill scan strips; verify schemaVersion + digest into inspector view
 - **Cross-pack kill audit export JSON:** download fail-closed cross-pack audit artifact (schemaVersion + digest) from `/packet` strip
 - **Measured DUC/status derivation:** live WellRow → residue / kill hints (`derive-from-well.ts` via `buildPacketFromWell`); no invented volumes; freeze on further export/import STOP gates
-- **Operator / DUC prioritization:** rank wells or operators from live search by measured status / days-since-spud / operator / county (`prioritize.ts`); table on wells + `/packet` live; no export/import strip
 
 Schema overview landed in [PR #1](https://github.com/ZuluYokohama/doapo/pull/1) (`feat/multi-domain-packet-bakken`).
 

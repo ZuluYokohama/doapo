@@ -8,11 +8,14 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
   MAX_COHORT_JSON_CHARS,
   MAX_COHORT_WELLS,
+  citeSnapshotDigest,
   cohortFilename,
   exportOutcomeCohort,
+  freezeCohortSnapshot,
   importOutcomeCohort,
   listPackIds,
   resolvePack,
+  saveAnalysisSnapshot,
   summarizeOutcomeCohort,
   type CohortClassCount,
   type DomainPack,
@@ -37,12 +40,16 @@ export function OutcomeCohortStrip({
   packIds,
   packId,
   onPackId,
+  searchQueryLabel = "",
+  onSnapshotSaved,
 }: {
   wells: WellRow[];
   pack: DomainPack | null;
   packIds?: string[];
   packId?: string;
   onPackId?: (id: string) => void;
+  searchQueryLabel?: string;
+  onSnapshotSaved?: () => void;
 }) {
   const [byClass, setByClass] = useState<CohortClassCount[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -50,6 +57,7 @@ export function OutcomeCohortStrip({
   const [skipped, setSkipped] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [exportNote, setExportNote] = useState<string | null>(null);
+  const [persistNote, setPersistNote] = useState<string | null>(null);
   const [importPaste, setImportPaste] = useState("");
   const [importDigest, setImportDigest] = useState<string | null>(null);
 
@@ -114,6 +122,47 @@ export function OutcomeCohortStrip({
       "exported · digest " + result.bundle.bundleDigest.slice(0, 12) + "…",
     );
     setImportDigest(null);
+  }
+
+  function onPersistSnapshot() {
+    setError(null);
+    setPersistNote(null);
+    if (activePack === null) {
+      setError("pack required");
+      return;
+    }
+    if (wells.length < 1) {
+      setError("no wells to persist");
+      return;
+    }
+    const frozen = freezeCohortSnapshot({
+      wells,
+      pack: activePack,
+      searchQueryLabel,
+      maxWells: MAX_COHORT_WELLS,
+    });
+    if (!frozen.ok) {
+      setError(frozen.reason);
+      return;
+    }
+    const saved = saveAnalysisSnapshot(frozen.snapshot);
+    if (!saved.ok) {
+      setError(saved.reason);
+      return;
+    }
+    if (frozen.snapshot.cohort) {
+      setByClass(frozen.snapshot.cohort.byClass);
+      setTotal(frozen.snapshot.cohort.total);
+      setUnmatched(frozen.snapshot.cohort.unmatched);
+      setSkipped(frozen.snapshot.cohort.skipped);
+    }
+    setPersistNote(
+      "persisted · " +
+        citeSnapshotDigest(frozen.snapshot.snapshotDigest) +
+        " · store " +
+        String(saved.count),
+    );
+    if (onSnapshotSaved) onSnapshotSaved();
   }
 
   function applyImportedBundle(
@@ -234,10 +283,24 @@ export function OutcomeCohortStrip({
         >
           Export JSON
         </button>
+        <button
+          type="button"
+          onClick={onPersistSnapshot}
+          disabled={!canAct}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
+        >
+          Persist snapshot
+        </button>
         <span className="font-mono text-xs text-muted">
           {wells.length} in view · cap {MAX_COHORT_WELLS}
         </span>
       </div>
+
+      {persistNote ? (
+        <p className="mt-3 break-all font-mono text-xs text-accent">
+          {persistNote}
+        </p>
+      ) : null}
 
       <form onSubmit={onImportPasteSubmit} className="mt-3 space-y-2">
         <label className="block text-xs tracking-wide text-muted uppercase">

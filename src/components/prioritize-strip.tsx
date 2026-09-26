@@ -1,6 +1,7 @@
 /**
  * Operator / DUC prioritization UI — ranks current search wells (capped).
  * Measured fields only. No export/import strip (freeze). No invented volumes.
+ * Optional Persist snapshot → durable localStorage freeze (digest).
  * Power of 10: bounded render lists, no recursion.
  */
 import { useState } from "react";
@@ -8,21 +9,36 @@ import {
   DUC_AGE_DAYS_THRESHOLD,
   MAX_PRIORITIZE_OPERATORS,
   MAX_PRIORITIZE_WELLS,
+  citeSnapshotDigest,
+  freezePrioritizeSnapshot,
   prioritizeOperators,
   prioritizeWells,
+  saveAnalysisSnapshot,
+  type DomainPack,
   type PrioritizeMode,
   type PrioritizeOperatorRow,
   type PrioritizeWellRow,
 } from "@/lib/packet";
 import type { WellRow } from "@/lib/outcomes";
 
-export function PrioritizeStrip({ wells }: { wells: WellRow[] }) {
+export function PrioritizeStrip({
+  wells,
+  pack = null,
+  searchQueryLabel = "",
+  onSnapshotSaved,
+}: {
+  wells: WellRow[];
+  pack?: DomainPack | null;
+  searchQueryLabel?: string;
+  onSnapshotSaved?: () => void;
+}) {
   const [mode, setMode] = useState<PrioritizeMode>("wells");
   const [wellRows, setWellRows] = useState<PrioritizeWellRow[] | null>(null);
   const [opRows, setOpRows] = useState<PrioritizeOperatorRow[] | null>(null);
   const [total, setTotal] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [persistNote, setPersistNote] = useState<string | null>(null);
 
   function onRank() {
     setError(null);
@@ -70,9 +86,48 @@ export function PrioritizeStrip({ wells }: { wells: WellRow[] }) {
     setWellRows(null);
     setOpRows(null);
     setError(null);
+    setPersistNote(null);
+  }
+
+  function onPersist() {
+    setError(null);
+    setPersistNote(null);
+    if (pack === null) {
+      setError("pack required to persist snapshot");
+      return;
+    }
+    if (wells.length < 1) {
+      setError("no wells to persist");
+      return;
+    }
+    const frozen = freezePrioritizeSnapshot({
+      wells,
+      packId: pack.id,
+      packVersion: pack.version,
+      mode,
+      searchQueryLabel,
+      maxWells: MAX_PRIORITIZE_WELLS,
+    });
+    if (!frozen.ok) {
+      setError(frozen.reason);
+      return;
+    }
+    const saved = saveAnalysisSnapshot(frozen.snapshot);
+    if (!saved.ok) {
+      setError(saved.reason);
+      return;
+    }
+    setPersistNote(
+      "persisted · " +
+        citeSnapshotDigest(frozen.snapshot.snapshotDigest) +
+        " · store " +
+        String(saved.count),
+    );
+    if (onSnapshotSaved) onSnapshotSaved();
   }
 
   const canAct = wells.length >= 1;
+  const canPersist = canAct && pack !== null;
   const ranked = wellRows !== null || opRows !== null;
 
   return (
@@ -84,8 +139,8 @@ export function PrioritizeStrip({ wells }: { wells: WellRow[] }) {
         Rank up to {MAX_PRIORITIZE_WELLS} current search wells by measured
         status and days-since-spud (DUC age threshold {DUC_AGE_DAYS_THRESHOLD}{" "}
         days). Operator rollup caps at {MAX_PRIORITIZE_OPERATORS} rows. No
-        invented volumes. Analysis table only — not an export/import freeze
-        strip.
+        invented volumes. Persist snapshot freezes the live rank into
+        localStorage (digest) — not an export/import treadmill.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -125,10 +180,25 @@ export function PrioritizeStrip({ wells }: { wells: WellRow[] }) {
             : MAX_PRIORITIZE_WELLS}{" "}
           well{wells.length === 1 ? "" : "s"}
         </button>
+        <button
+          type="button"
+          onClick={onPersist}
+          disabled={!canPersist}
+          className="min-h-11 rounded-md border border-line bg-raised px-3 py-2 text-sm text-fg disabled:opacity-50"
+        >
+          Persist snapshot
+        </button>
         <span className="font-mono text-xs text-muted">
           {wells.length} in view · cap {MAX_PRIORITIZE_WELLS}
+          {pack ? " · " + pack.id + "@" + pack.version : ""}
         </span>
       </div>
+
+      {persistNote ? (
+        <p className="mt-3 break-all font-mono text-xs text-accent">
+          {persistNote}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="mt-3 text-sm text-accent" role="alert">

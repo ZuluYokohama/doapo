@@ -7,6 +7,7 @@ import { KillFactAuthoringStrip } from "@/components/kill-fact-authoring-strip";
 import { BatchKillScanStrip } from "@/components/batch-kill-scan-strip";
 import { OutcomeCohortStrip } from "@/components/outcome-cohort-strip";
 import { PrioritizeStrip } from "@/components/prioritize-strip";
+import { AnalysisSnapshotStrip } from "@/components/analysis-snapshot-strip";
 import { CrossPackKillAuditStrip } from "@/components/cross-pack-kill-audit-strip";
 import {
   exampleAgentSelfOpenStop,
@@ -1149,6 +1150,7 @@ function PacketPage() {
   );
   const [draft, setDraft] = useState(() => search.api ?? "");
   const [query, setQuery] = useState(() => search.api ?? "");
+  const [snapshotRefresh, setSnapshotRefresh] = useState(0);
   const [results, setResults] = useState<WellRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1763,8 +1765,16 @@ function PacketPage() {
           <OutcomeCohortStrip
             wells={results}
             pack={packLookup.ok ? packLookup.pack : null}
+            searchQueryLabel={query.trim()}
+            onSnapshotSaved={() => setSnapshotRefresh((n) => n + 1)}
           />
-          <PrioritizeStrip wells={results} />
+          <PrioritizeStrip
+            wells={results}
+            pack={packLookup.ok ? packLookup.pack : null}
+            searchQueryLabel={query.trim()}
+            onSnapshotSaved={() => setSnapshotRefresh((n) => n + 1)}
+          />
+          <AnalysisSnapshotStrip refreshKey={snapshotRefresh} />
         </div>
       )}
 
