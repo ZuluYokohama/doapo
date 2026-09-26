@@ -17,6 +17,7 @@ import {
   buildPacketFromWell,
   countSealsForSubject,
   createLedger,
+  checkKillConditions,
   evaluatePacket,
   evidenceFilename,
   exportPacketEvidence,
@@ -441,6 +442,61 @@ function downloadJsonFile(json: string, filename: string): void {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+
+function KillCheckStrip({
+  packId,
+  packet,
+  validationOk,
+}: {
+  packId: string | null;
+  packet: IssuePacket | null;
+  validationOk: boolean;
+}) {
+  if (!packet || !validationOk || packId === null || packId.length === 0) {
+    return null;
+  }
+  const looked = lookupPack(packId);
+  if (!looked.ok) {
+    return (
+      <section className="mb-4 rounded-md border border-line bg-surface p-4">
+        <h2 className="text-xs tracking-widest text-accent uppercase">
+          Kill check
+        </h2>
+        <p className="mt-2 text-sm text-fg">
+          <span className="font-mono text-accent">fail-closed</span> —{" "}
+          {looked.reason}
+        </p>
+      </section>
+    );
+  }
+  const check = checkKillConditions(looked.pack, packet);
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Kill check
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Runtime match: measured fact key equals kill id (or kill:id) with value
+        &quot;triggered&quot;. Hit forces STOP — evaluator cannot PASS past it.
+      </p>
+      {!check.ok ? (
+        <p className="mt-3 text-sm text-fg" role="alert">
+          <span className="font-mono text-accent">fail-closed</span> —{" "}
+          {check.reason}
+        </p>
+      ) : check.hit ? (
+        <div className="mt-3 rounded-md border border-line bg-raised px-3 py-2 text-sm">
+          <p className="font-mono text-accent uppercase">STOP — kill hit</p>
+          <p className="mt-1 font-mono text-fg">{check.killId}</p>
+          <p className="mt-1 text-muted">{check.statement}</p>
+        </div>
+      ) : (
+        <p className="mt-3 font-mono text-sm text-fg">no kill triggered</p>
+      )}
+    </section>
+  );
 }
 
 function EvidenceExportStrip({
@@ -1034,6 +1090,11 @@ function PacketPage() {
             fail-closed — {exportError}
           </p>
         ) : null}
+        <KillCheckStrip
+          packId={packet ? packet.packId : null}
+          packet={packet}
+          validationOk={validation !== null && validation.ok}
+        />
         <EvidenceExportStrip
           packet={packet}
           ledger={sessionLedger}
