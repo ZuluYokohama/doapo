@@ -50,7 +50,9 @@ See `roles.ts` and [ADR-002-evaluator-split.md](ADR-002-evaluator-split.md).
 
 ### Append-only seal ledger
 
-`ledger.ts` backs the `ledger` evidence class with bounded, fail-closed seals (`MAX_SEALS` = 256). Digests chain via `prevDigest` (empty string at genesis). No rewrite, delete, or middle insert. Roles stay pure; UI/demo may call `appendSeal` / `appendOpenSeal` after propose → evaluate → open. See [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
+`ledger.ts` backs the `ledger` evidence class with bounded, fail-closed seals (`MAX_SEALS` = 256). Digests chain via `prevDigest` (empty string at genesis). No rewrite, delete, or middle insert. Roles stay pure; UI/demo may call `appendSeal` / `appendOpenSeal` after propose → evaluate → open.
+
+**Subject-scoped history:** `listSealsForSubject` / `countSealsForSubject` filter by `packetSubjectId` (UI-capped). **Session store** (`ledger-store.ts`) persists one demo ledger in `sessionStorage` (versioned JSON, chain verified on load; corrupt → empty). Demo only — not durable authority. See [ADR-003-seal-ledger.md](ADR-003-seal-ledger.md).
 
 ## Gate verdicts
 
@@ -86,8 +88,9 @@ Public sources listed on a pack are substrate / standards pointers only. They ar
 | `fixtures/example-bakken-issue.ts` | Bakken STOP + valid OPEN examples |
 | `fixtures/example-duc-queue-issue.ts` | DUC queue STOP + valid OPEN examples |
 | `roles.ts` | Runtime propose / evaluate / open paths |
-| `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain) |
-| `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet (fail-closed) |
+| `ledger.ts` | Append-only seal ledger (`SealRecord`, `appendSeal`, tip chain, subject list) |
+| `ledger-store.ts` | Browser demo `sessionStorage` ledger (versioned; fail-closed verify) |
+| `from-well.ts` | Live NDIC `WellRow` → measured facts + issue packet; `wellSubjectId` |
 | `packet.test.ts` | Node test suite |
 | `from-well.test.ts` | Live well mapping tests (no volumes; status→outcome; bounds) |
 

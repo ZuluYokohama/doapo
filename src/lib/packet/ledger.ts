@@ -275,3 +275,122 @@ export function listRecentSeals(
   }
   return out;
 }
+
+
+/**
+ * Seals for one subject, chronological, hard-capped.
+ * Fail-closed: empty / non-string subjectId → [].
+ */
+export function listSealsForSubject(
+  ledger: SealLedger,
+  subjectId: string,
+  cap: number = UI_LEDGER_CAP,
+): SealRecord[] {
+  assertLedger(ledger);
+  console.assert(typeof subjectId === "string", "subjectId string");
+  if (typeof subjectId !== "string" || subjectId.length === 0) {
+    return [];
+  }
+  if (subjectId.length > MAX_ID_LEN) {
+    return [];
+  }
+  const bound = cap < 1 ? 1 : cap > UI_LEDGER_CAP ? UI_LEDGER_CAP : cap;
+  const matched: SealRecord[] = [];
+  const n = ledger.seals.length;
+  let i = 0;
+  while (i < n) {
+    const row = ledger.seals[i];
+    if (row.packetSubjectId === subjectId) {
+      matched.push(row);
+    }
+    i += 1;
+  }
+  if (matched.length <= bound) {
+    return matched;
+  }
+  const start = matched.length - bound;
+  const out: SealRecord[] = [];
+  let j = start;
+  while (j < matched.length) {
+    out.push(matched[j]);
+    j += 1;
+  }
+  console.assert(out.length <= bound, "subject list within cap");
+  return out;
+}
+
+/** Count seals for subject (full ledger scan, no UI cap). Fail-closed empty id → 0. */
+export function countSealsForSubject(
+  ledger: SealLedger,
+  subjectId: string,
+): number {
+  assertLedger(ledger);
+  console.assert(typeof subjectId === "string", "subjectId string");
+  if (typeof subjectId !== "string" || subjectId.length === 0) {
+    return 0;
+  }
+  if (subjectId.length > MAX_ID_LEN) {
+    return 0;
+  }
+  let count = 0;
+  const n = ledger.seals.length;
+  let i = 0;
+  while (i < n) {
+    if (ledger.seals[i].packetSubjectId === subjectId) {
+      count += 1;
+    }
+    i += 1;
+  }
+  console.assert(count <= MAX_SEALS, "count within MAX_SEALS");
+  return count;
+}
+
+export type VerifyChainResult =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+/**
+ * Recompute digests and prevDigest links. Fail-closed on any break.
+ */
+export function verifySealChain(ledger: SealLedger): VerifyChainResult {
+  assertLedger(ledger);
+  const n = ledger.seals.length;
+  console.assert(n <= MAX_SEALS, "verify within MAX_SEALS");
+  if (n === 0) {
+    return { ok: true };
+  }
+  let i = 0;
+  let expectedPrev = "";
+  while (i < n) {
+    const row = ledger.seals[i];
+    if (row === null || row === undefined) {
+      return { ok: false, reason: "chain: missing seal at index " + String(i) };
+    }
+    if (row.prevDigest !== expectedPrev) {
+      return {
+        ok: false,
+        reason: "chain: prevDigest mismatch at index " + String(i),
+      };
+    }
+    const recomputed = computeSealDigest({
+      id: row.id,
+      atIso: row.atIso,
+      kind: row.kind,
+      packetSubjectId: row.packetSubjectId,
+      packId: row.packId,
+      gate: row.gate,
+      proposedBy: row.proposedBy,
+      prevDigest: row.prevDigest,
+      note: row.note,
+    });
+    if (recomputed !== row.digest) {
+      return {
+        ok: false,
+        reason: "chain: digest mismatch at index " + String(i),
+      };
+    }
+    expectedPrev = row.digest;
+    i += 1;
+  }
+  return { ok: true };
+}

@@ -59,12 +59,28 @@ export {
   sealFromPacket,
   appendOpenSeal,
   listRecentSeals,
+  listSealsForSubject,
+  countSealsForSubject,
+  verifySealChain,
   type SealKind,
   type SealRecord,
   type SealAppendInput,
   type SealLedger,
   type AppendSealResult,
+  type VerifyChainResult,
 } from "./ledger.ts";
+
+export {
+  LEDGER_STORE_KEY,
+  LEDGER_STORE_VERSION,
+  LEDGER_STORE_MAX_BYTES,
+  loadSessionLedger,
+  saveSessionLedger,
+  clearSessionLedger,
+  parseStoredLedger,
+  type LoadLedgerResult,
+  type SaveLedgerResult,
+} from "./ledger-store.ts";
 
 export { BAKKEN_PACK } from "./packs/bakken.ts";
 export { DUC_QUEUE_PACK } from "./packs/duc-queue.ts";
@@ -82,6 +98,7 @@ export {
 export {
   MAX_WELL_FACTS,
   wellToMeasuredFacts,
+  wellSubjectId,
   buildPacketFromWell,
   type BuildPacketFromWellInput,
   type BuildPacketResult,

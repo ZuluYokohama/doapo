@@ -14,16 +14,21 @@ import {
   UI_LEDGER_CAP,
   appendSeal,
   buildPacketFromWell,
+  countSealsForSubject,
   createLedger,
   evaluatePacket,
   listPackIds,
   listRecentSeals,
+  listSealsForSubject,
+  loadSessionLedger,
   lookupPack,
   openCandidate,
   proposePacket,
+  saveSessionLedger,
   sealFromPacket,
   tipDigest,
   validateIssuePacket,
+  wellSubjectId,
   type IssuePacket,
   type SealLedger,
   type SealRecord,
@@ -102,13 +107,17 @@ type RuntimeStep = {
   detail: string;
 };
 
-function buildRuntimeDemo(seed: IssuePacket): {
+function buildRuntimeDemo(
+  seed: IssuePacket,
+  baseLedger: SealLedger = createLedger(),
+): {
   steps: RuntimeStep[];
   packet: IssuePacket;
   ledger: SealLedger;
 } {
   const steps: RuntimeStep[] = [];
-  let ledger = createLedger();
+  let ledger: SealLedger = { seals: baseLedger.seals.slice() };
+  console.assert(ledger.seals.length <= 256, "base ledger bounded");
 
   const openAsk = proposePacket({
     packId: seed.packId,
@@ -257,8 +266,8 @@ function RuntimePathStrip({ steps }: { steps: RuntimeStep[] }) {
         Runtime path
       </h2>
       <p className="mt-2 text-sm text-muted">
-        Demo only (no persistence): propose → evaluate → open. Agent path cannot
-        reach OPEN_CANDIDATE; only human_open may stamp it.
+        Demo path: propose → evaluate → open. Seals append to the tab session
+        ledger. Agent path cannot reach OPEN_CANDIDATE; only human_open may stamp it.
       </p>
       <ol className="mt-3 space-y-2">
         {steps.map((step) => (
@@ -297,8 +306,8 @@ function LedgerStrip({ ledger }: { ledger: SealLedger }) {
     <section className="mb-4 rounded-md border border-line bg-surface p-4">
       <h2 className="text-xs tracking-widest text-accent uppercase">Ledger</h2>
       <p className="mt-2 text-sm text-muted">
-        Append-only seal demo in component state (cap {UI_LEDGER_CAP} shown). No
-        rewrite / delete. Tip is the chain head digest.
+        Append-only session ledger (cap {UI_LEDGER_CAP} shown). Demo persistence
+        via sessionStorage — not durable authority. Tip is the chain head digest.
       </p>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
@@ -332,6 +341,81 @@ function LedgerStrip({ ledger }: { ledger: SealLedger }) {
                 {row.prevDigest.length === 0
                   ? "genesis"
                   : shortDigest(row.prevDigest)}
+              </p>
+              {row.note.length > 0 ? (
+                <p className="mt-1 text-muted">{row.note}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+
+function PacketHistoryStrip({
+  ledger,
+  subjectId,
+}: {
+  ledger: SealLedger;
+  subjectId: string | null;
+}) {
+  const safeId =
+    subjectId !== null && subjectId.length > 0 ? subjectId : "";
+  const recent: SealRecord[] =
+    safeId.length > 0
+      ? listSealsForSubject(ledger, safeId, UI_LEDGER_CAP)
+      : [];
+  const total =
+    safeId.length > 0 ? countSealsForSubject(ledger, safeId) : 0;
+  return (
+    <section className="mb-4 rounded-md border border-line bg-surface p-4">
+      <h2 className="text-xs tracking-widest text-accent uppercase">
+        Packet history
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        Seals for this subject from the session ledger (cap {UI_LEDGER_CAP}{" "}
+        shown). Filtered by subjectId — not a full-chain rewrite.
+      </p>
+      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-muted uppercase">Subject</dt>
+          <dd className="font-mono text-fg">
+            {safeId.length > 0 ? safeId : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted uppercase">Seals (subject)</dt>
+          <dd className="font-mono text-fg">
+            {safeId.length > 0 ? String(total) : "—"}
+          </dd>
+        </div>
+      </dl>
+      {safeId.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">
+          No subject selected — history empty.
+        </p>
+      ) : recent.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">
+          No seals for this subject yet.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {recent.map((row) => (
+            <li
+              key={row.id + "-" + row.digest}
+              className="rounded-md border border-line bg-raised px-3 py-2 text-sm"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="font-mono text-fg">{row.kind}</span>
+                <span className="text-xs tracking-wide text-muted uppercase">
+                  {row.gate}
+                </span>
+              </div>
+              <p className="mt-1 font-mono text-xs text-muted">{row.atIso}</p>
+              <p className="mt-1 font-mono text-xs text-muted">
+                {shortDigest(row.digest)}
               </p>
               {row.note.length > 0 ? (
                 <p className="mt-1 text-muted">{row.note}</p>
@@ -508,6 +592,26 @@ function PacketPage() {
   const [listError, setListError] = useState<string | null>(null);
   const [selected, setSelected] = useState<WellRow | null>(null);
   const [runLiveRuntime, setRunLiveRuntime] = useState(false);
+  const [sessionLedger, setSessionLedger] = useState<SealLedger>(() =>
+    createLedger(),
+  );
+  const [storeReason, setStoreReason] = useState<string | null>(null);
+  const [fixtureRuntimeSteps, setFixtureRuntimeSteps] = useState<
+    RuntimeStep[] | null
+  >(null);
+  const [fixtureRuntimePacket, setFixtureRuntimePacket] =
+    useState<IssuePacket | null>(null);
+  const [liveRuntimeSteps, setLiveRuntimeSteps] = useState<
+    RuntimeStep[] | null
+  >(null);
+  const [liveRuntimePacket, setLiveRuntimePacket] =
+    useState<IssuePacket | null>(null);
+
+  useEffect(() => {
+    const loaded = loadSessionLedger();
+    setSessionLedger(loaded.ledger);
+    setStoreReason(loaded.reason);
+  }, []);
 
   useEffect(() => {
     if (pageMode !== "live") return;
@@ -566,6 +670,8 @@ function PacketPage() {
   function setMode(next: PageMode) {
     setPageMode(next);
     setRunLiveRuntime(false);
+    setLiveRuntimeSteps(null);
+    setLiveRuntimePacket(null);
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -582,6 +688,8 @@ function PacketPage() {
     setQuery(q);
     setSelected(null);
     setRunLiveRuntime(false);
+    setLiveRuntimeSteps(null);
+    setLiveRuntimePacket(null);
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -595,6 +703,8 @@ function PacketPage() {
   function selectWell(well: WellRow) {
     setSelected(well);
     setRunLiveRuntime(false);
+    setLiveRuntimeSteps(null);
+    setLiveRuntimePacket(null);
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -608,6 +718,8 @@ function PacketPage() {
   function changePack(id: string) {
     setPackId(id);
     setRunLiveRuntime(false);
+    setLiveRuntimeSteps(null);
+    setLiveRuntimePacket(null);
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -639,19 +751,44 @@ function PacketPage() {
   const liveBuildError =
     liveBuilt && !liveBuilt.ok ? liveBuilt.reason : null;
 
-  const fixtureRuntime = useMemo(
-    () => buildRuntimeDemo(exampleHumanOpenCandidate()),
-    [],
-  );
+  function persistLedger(next: SealLedger) {
+    console.assert(next.seals.length <= 256, "persist within MAX_SEALS");
+    setSessionLedger(next);
+    const saved = saveSessionLedger(next);
+    setStoreReason(saved.ok ? null : saved.reason);
+  }
 
-  const liveRuntime = useMemo(() => {
-    if (!livePacket || !runLiveRuntime) return null;
-    return buildRuntimeDemo(livePacket);
-  }, [livePacket, runLiveRuntime]);
+  function runFixtureRuntime() {
+    const base = loadSessionLedger().ledger;
+    const demo = buildRuntimeDemo(exampleHumanOpenCandidate(), base);
+    persistLedger(demo.ledger);
+    setFixtureRuntimeSteps(demo.steps);
+    setFixtureRuntimePacket(demo.packet);
+  }
+
+  function runLiveRuntimePath() {
+    if (!livePacket) return;
+    const base = loadSessionLedger().ledger;
+    const demo = buildRuntimeDemo(livePacket, base);
+    persistLedger(demo.ledger);
+    setLiveRuntimeSteps(demo.steps);
+    setLiveRuntimePacket(demo.packet);
+    setRunLiveRuntime(true);
+  }
+
+  function selectFixture(id: FixtureId) {
+    setFixtureId(id);
+    if (id === "runtime") {
+      runFixtureRuntime();
+    } else {
+      setFixtureRuntimeSteps(null);
+      setFixtureRuntimePacket(null);
+    }
+  }
 
   const fixturePacket = useMemo(() => {
     if (fixtureId === "runtime") {
-      return fixtureRuntime.packet;
+      return fixtureRuntimePacket ?? exampleHumanOpenCandidate();
     }
     let i = 0;
     while (i < FIXTURES.length) {
@@ -661,14 +798,20 @@ function PacketPage() {
       i += 1;
     }
     return exampleHumanOpenCandidate();
-  }, [fixtureId, fixtureRuntime.packet]);
+  }, [fixtureId, fixtureRuntimePacket]);
 
   const packet: IssuePacket | null =
     pageMode === "live"
-      ? liveRuntime
-        ? liveRuntime.packet
+      ? runLiveRuntime && liveRuntimePacket
+        ? liveRuntimePacket
         : livePacket
       : fixturePacket;
+
+  const historySubjectId: string | null = (() => {
+    if (packet && packet.subjectId.length > 0) return packet.subjectId;
+    if (selected) return wellSubjectId(selected);
+    return null;
+  })();
 
   const validation = useMemo(
     () => (packet ? validateIssuePacket(packet) : null),
@@ -755,7 +898,7 @@ function PacketPage() {
                 type="button"
                 role="tab"
                 aria-selected={on}
-                onClick={() => setFixtureId(row.id)}
+                onClick={() => selectFixture(row.id)}
                 className={
                   "min-h-11 rounded-md border px-3 py-2 text-left text-sm " +
                   (on
@@ -788,7 +931,7 @@ function PacketPage() {
             <div className="mb-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setRunLiveRuntime(true)}
+                onClick={() => runLiveRuntimePath()}
                 className={
                   "min-h-11 rounded-md border px-3 py-2 text-sm " +
                   (runLiveRuntime
@@ -804,18 +947,24 @@ function PacketPage() {
       )}
 
       <div className="mt-4">
-        {pageMode === "fixtures" && fixtureId === "runtime" ? (
-          <>
-            <RuntimePathStrip steps={fixtureRuntime.steps} />
-            <LedgerStrip ledger={fixtureRuntime.ledger} />
-          </>
+        {pageMode === "fixtures" &&
+        fixtureId === "runtime" &&
+        fixtureRuntimeSteps ? (
+          <RuntimePathStrip steps={fixtureRuntimeSteps} />
         ) : null}
-        {pageMode === "live" && liveRuntime ? (
-          <>
-            <RuntimePathStrip steps={liveRuntime.steps} />
-            <LedgerStrip ledger={liveRuntime.ledger} />
-          </>
+        {pageMode === "live" && liveRuntimeSteps ? (
+          <RuntimePathStrip steps={liveRuntimeSteps} />
         ) : null}
+        {storeReason ? (
+          <p className="mb-4 text-sm text-muted" role="status">
+            Session ledger: {storeReason}
+          </p>
+        ) : null}
+        <LedgerStrip ledger={sessionLedger} />
+        <PacketHistoryStrip
+          ledger={sessionLedger}
+          subjectId={historySubjectId}
+        />
         {pageMode === "live" && !packet ? (
           <section className="rounded-md border border-line bg-surface p-4">
             <h2 className="text-xs tracking-widest text-accent uppercase">
